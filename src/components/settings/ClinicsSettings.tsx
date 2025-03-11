@@ -31,12 +31,12 @@ import {
 } from '@mui/icons-material';
 import { useClinicTypes, ClinicType } from '../../contexts/LocationContext';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+// import { useAuth } from '../../contexts/AuthContext'; // Temporarily removed since we're not using it
 import databaseService from '../../services/DatabaseService';
 
 const ClinicsSettings: React.FC = () => {
   const { clinicTypes, refreshClinicTypes } = useClinicTypes();
-  const { /* isAdmin */ } = useAuth();
+  // Removed useAuth hook since we're not using it right now
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clinicTypeToDelete, setClinicTypeToDelete] = useState<ClinicType | null>(null);
