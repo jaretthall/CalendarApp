@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import firebaseStorageService from './FirebaseStorageService';
 import databaseService from './DatabaseService';
+import { auth } from '../config/firebase-config';
 
 // Types
 interface SyncResult {
@@ -18,8 +19,18 @@ class SyncService {
   // Initialize the sync service
   async initialize(): Promise<boolean> {
     try {
+      // Check if user is authenticated
+      if (!auth.currentUser) {
+        console.warn("Sync service initialization failed: User not authenticated");
+        return false;
+      }
+      
       // Initialize Firebase Storage service
-      await firebaseStorageService.initialize();
+      const storageInitialized = await firebaseStorageService.initialize();
+      if (!storageInitialized) {
+        console.warn("Sync service initialization failed: Firebase Storage service initialization failed");
+        return false;
+      }
       
       this.isInitialized = true;
       console.log("Sync service initialized");

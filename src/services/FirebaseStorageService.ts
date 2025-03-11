@@ -1,7 +1,7 @@
 // Firebase Storage Service
 import { format } from 'date-fns';
 import { ref, uploadBytes, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
-import { storage } from '../config/firebase-config';
+import { storage, auth } from '../config/firebase-config';
 
 // Types
 interface SyncResult {
@@ -21,6 +21,12 @@ class FirebaseStorageService {
   // Initialize the service
   async initialize(): Promise<boolean> {
     try {
+      // Check if user is authenticated
+      if (!auth.currentUser) {
+        console.warn('Firebase Storage service initialization failed: User not authenticated');
+        return false;
+      }
+      
       this.isInitialized = true;
       console.log('Firebase Storage service initialized');
       return true;
@@ -32,15 +38,30 @@ class FirebaseStorageService {
 
   // Helper method to get download URL and handle CORS
   private async getProxiedDownloadURL(fileRef: any): Promise<string> {
-    const originalUrl = await getDownloadURL(fileRef);
-    
-    // For local development, use the proxy
-    if (this.isLocalhost) {
-      // Replace the Firebase Storage URL with our proxy URL
-      return originalUrl.replace('https://firebasestorage.googleapis.com', '/firebase-api');
+    try {
+      // Ensure user is authenticated
+      if (!auth.currentUser) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Get the token
+      const token = await auth.currentUser.getIdToken();
+      
+      const originalUrl = await getDownloadURL(fileRef);
+      
+      // For local development, use the proxy
+      if (this.isLocalhost) {
+        // Replace the Firebase Storage URL with our proxy URL
+        return originalUrl.replace('https://firebasestorage.googleapis.com', '/firebase-api');
+      }
+      
+      // For production, append the auth token as a query parameter
+      // This helps ensure the request is authenticated
+      return `${originalUrl}?auth=${token}`;
+    } catch (error) {
+      console.error("Error getting download URL:", error);
+      throw error;
     }
-    
-    return originalUrl;
   }
 
   // Export data to Firebase Storage
@@ -54,6 +75,15 @@ class FirebaseStorageService {
     }
 
     try {
+      // Ensure user is authenticated
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: "User not authenticated",
+          timestamp: new Date().toISOString()
+        };
+      }
+      
       const fileName = `calendar_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
       const filePath = `${this.calendarFolderPath}/${fileName}`;
       const fileRef = ref(storage, filePath);
@@ -68,7 +98,9 @@ class FirebaseStorageService {
       await uploadBytes(fileRef, blob, {
         contentType: 'application/json',
         customMetadata: {
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
         }
       });
       
@@ -235,6 +267,15 @@ class FirebaseStorageService {
     }
 
     try {
+      // Ensure user is authenticated
+      if (!auth.currentUser) {
+        return {
+          success: false,
+          message: "User not authenticated",
+          timestamp: new Date().toISOString()
+        };
+      }
+      
       const fileName = `backup_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
       const filePath = `${this.backupFolderPath}/${fileName}`;
       const fileRef = ref(storage, filePath);
@@ -249,7 +290,9 @@ class FirebaseStorageService {
       await uploadBytes(fileRef, blob, {
         contentType: 'application/json',
         customMetadata: {
-          'Access-Control-Allow-Origin': '*'
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
         }
       });
       

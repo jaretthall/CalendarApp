@@ -16,6 +16,9 @@ module.exports = function(app) {
         proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
         proxyRes.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
         proxyRes.headers['Access-Control-Max-Age'] = '3600';
+        
+        // Log the response headers for debugging
+        console.log('Proxy response headers:', proxyRes.headers);
       }
     })
   );
