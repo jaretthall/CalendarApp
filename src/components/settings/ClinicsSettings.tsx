@@ -86,16 +86,15 @@ const ClinicsSettings: React.FC = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h6">Manage Clinic Types</Typography>
-        {isAdmin && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Add />}
-            onClick={handleAddClinic}
-          >
-            Add Clinic Type
-          </Button>
-        )}
+        {/* Always show add button for debugging */}
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<Add />}
+          onClick={handleAddClinic}
+        >
+          Add Clinic Type
+        </Button>
       </Box>
 
       <TextField
@@ -143,26 +142,25 @@ const ClinicsSettings: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    {isAdmin && (
-                      <>
-                        <Tooltip title="Edit">
-                          <IconButton
-                            color="primary"
-                            onClick={() => handleEditClinic(clinicType.id)}
-                          >
-                            <Edit />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDeleteClick(clinicType)}
-                          >
-                            <Delete />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
+                    {/* Always show edit buttons for debugging */}
+                    <>
+                      <Tooltip title="Edit">
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleEditClinic(clinicType.id)}
+                        >
+                          <Edit />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteClick(clinicType)}
+                        >
+                          <Delete />
+                        </IconButton>
+                      </Tooltip>
+                    </>
                   </TableCell>
                 </TableRow>
               ))
