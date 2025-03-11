@@ -36,7 +36,7 @@ import databaseService from '../../services/DatabaseService';
 
 const ClinicsSettings: React.FC = () => {
   const { clinicTypes, refreshClinicTypes } = useClinicTypes();
-  const { isAdmin } = useAuth();
+  const { /* isAdmin */ } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clinicTypeToDelete, setClinicTypeToDelete] = useState<ClinicType | null>(null);
