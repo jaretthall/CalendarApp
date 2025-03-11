@@ -20,10 +20,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Admin user emails - replace with your actual admin emails
-const ADMIN_EMAILS = ['tiffanygood@clinicamedicos.org', 'jarett@clinicamedicos.org'];
+// Admin credentials
+const ADMIN_EMAIL = 'admin@clinicamedicos.org';
+const ADMIN_PASSWORD = 'FamMed25!';
 
-// Temp read-only user for testing
+// Read-only credentials for regular users
 const READ_ONLY_EMAIL = 'readonly@example.com';
 const READ_ONLY_PASSWORD = 'readonly';
 
@@ -40,9 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(user);
       setIsAuthenticated(!!user);
       
-      // Check if user is an admin
+      // Check if user is admin by email
       if (user && user.email) {
-        setIsAdmin(ADMIN_EMAILS.includes(user.email));
+        setIsAdmin(user.email === ADMIN_EMAIL);
       } else {
         setIsAdmin(false);
       }
@@ -59,6 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      // Special case for admin login
+      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+        return true;
+      }
+      
       // For read-only access with empty password, use the read-only account
       if (email.trim() !== '' && password === '') {
         await signInWithEmailAndPassword(auth, READ_ONLY_EMAIL, READ_ONLY_PASSWORD);

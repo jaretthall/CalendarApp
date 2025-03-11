@@ -18,19 +18,27 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Create a test user
-const email = 'test@example.com';
-const password = 'Test123!';
+// Create admin user
+const email = 'admin@clinicamedicos.org';
+const password = 'FamMed25!';
 
 createUserWithEmailAndPassword(auth, email, password)
   .then((userCredential) => {
     // User created successfully
     const user = userCredential.user;
-    console.log('User created successfully:', user.uid);
+    console.log('Admin user created successfully:', user.uid);
+    console.log('Email:', email);
+    console.log('Password:', password);
     process.exit(0);
   })
   .catch((error) => {
     // Error creating user
-    console.error('Error creating user:', error.code, error.message);
+    console.error('Error creating admin user:', error.code, error.message);
+    
+    // If error is because user already exists, show a different message
+    if (error.code === 'auth/email-already-in-use') {
+      console.log('Admin user already exists. You can use the existing account to log in.');
+    }
+    
     process.exit(1);
   }); 
