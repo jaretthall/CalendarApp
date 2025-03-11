@@ -20,9 +20,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Admin user email - replace with your admin email
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ADMIN_EMAIL = 'admin@example.com';
+// Admin user emails - replace with your actual admin emails
+const ADMIN_EMAILS = ['admin@example.com', 'jaretthall@example.com'];
 
 // Temp read-only user for testing
 const READ_ONLY_EMAIL = 'readonly@example.com';
@@ -41,8 +40,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(user);
       setIsAuthenticated(!!user);
       
-      // For testing purposes, make all authenticated users admins
-      setIsAdmin(!!user); // user?.email === ADMIN_EMAIL
+      // Check if user is an admin
+      if (user && user.email) {
+        setIsAdmin(ADMIN_EMAILS.includes(user.email));
+      } else {
+        setIsAdmin(false);
+      }
       
       // Set read-only status
       setIsReadOnly(user?.email === READ_ONLY_EMAIL);
