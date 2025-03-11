@@ -12,7 +12,6 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
-  Avatar,
   Badge,
   Chip,
   CircularProgress
@@ -34,9 +33,7 @@ import {
   CloudDone,
   CloudOff,
   CloudSync,
-  CloudQueue,
-  People,
-  LocationOn
+  CloudQueue
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useShifts } from '../../contexts/ShiftContext';
@@ -196,6 +193,7 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getSyncTooltipText = () => {
     const timeString = lastSyncTime ? 
       `Last synced: ${lastSyncTime.toLocaleTimeString()}` : 
@@ -313,7 +311,7 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
             onClose={handleExportMenuClose}
           >
             <MenuItem onClick={handleExportPDF}>
-              <PictureAsPdf sx={{ mr: 1 }} /> Export as PDF
+              <PictureAsPdf sx={{ mr: 1 }} /> Export Calendar as PDF
             </MenuItem>
             {isAdmin && (
               <>

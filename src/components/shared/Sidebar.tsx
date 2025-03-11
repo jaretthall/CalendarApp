@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Drawer,
@@ -11,19 +11,21 @@ import {
   Typography,
   Button,
   Chip,
-  Avatar
+  Avatar,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
   CalendarViewMonth,
-  People,
   Add,
   ViewWeek,
-  LocationOn,
-  Settings
+  Settings,
+  PictureAsPdf
 } from '@mui/icons-material';
 import { useProviders } from '../../contexts/EmployeeContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import ProviderScheduleList from '../provider/ProviderScheduleList';
 
 interface SidebarProps {
   open: boolean;
@@ -37,6 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
   const { isAdmin, isAuthenticated } = useAuth();
   const activeProviders = getActiveProviders();
   const activeClinicTypes = clinicTypes.filter(ct => ct.status === 'active');
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState<boolean>(false);
 
   const drawerWidth = 280;
 
@@ -56,6 +60,17 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
   menuItems.push(
     { text: 'Settings', icon: <Settings />, path: '/settings' }
   );
+
+  // Handle opening the schedule modal
+  const handleViewSchedule = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setScheduleModalOpen(true);
+  };
+
+  // Handle closing the schedule modal
+  const handleCloseScheduleModal = () => {
+    setScheduleModalOpen(false);
+  };
 
   return (
     <Drawer
@@ -137,7 +152,15 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
         
         <List sx={{ maxHeight: 300, overflow: 'auto' }}>
           {activeProviders.map((provider) => (
-            <ListItem key={provider.id} sx={{ px: 0, py: 0.5 }}>
+            <ListItem 
+              key={provider.id} 
+              sx={{ 
+                px: 0, 
+                py: 0.5,
+                display: 'flex',
+                justifyContent: 'space-between'
+              }}
+            >
               <Chip
                 avatar={
                   <Avatar style={{ backgroundColor: provider.color }}>
@@ -146,8 +169,20 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
                 }
                 label={`${provider.firstName} ${provider.lastName}`}
                 variant="outlined"
-                sx={{ width: '100%', justifyContent: 'flex-start' }}
+                sx={{ 
+                  width: 'calc(100% - 40px)', 
+                  justifyContent: 'flex-start' 
+                }}
               />
+              <Tooltip title="Export Schedule as PDF">
+                <IconButton 
+                  size="small" 
+                  color="primary"
+                  onClick={() => handleViewSchedule(provider.id)}
+                >
+                  <PictureAsPdf fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </ListItem>
           ))}
         </List>
@@ -189,6 +224,13 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
           ))}
         </List>
       </Box>
+
+      {/* Provider Schedule Modal with PDF export capability */}
+      <ProviderScheduleList
+        providerId={selectedProviderId}
+        open={scheduleModalOpen}
+        onClose={handleCloseScheduleModal}
+      />
     </Drawer>
   );
 };
