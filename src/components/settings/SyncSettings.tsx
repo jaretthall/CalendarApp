@@ -17,7 +17,6 @@ import {
   ListItemText
 } from '@mui/material';
 import {
-  CloudUpload,
   CloudDownload,
   Sync as SyncIcon,
   Backup as BackupIcon,

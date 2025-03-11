@@ -1,5 +1,4 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import databaseService from '../services/DatabaseService';
 
 export interface Provider {

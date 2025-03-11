@@ -13,7 +13,6 @@ import {
   setDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 import { firestore } from '../config/firebase-config';
 
 // Collection names

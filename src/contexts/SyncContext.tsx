@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import databaseService from '../services/DatabaseService';
 import syncService from '../services/SyncService';
 
 // Define the possible sync statuses

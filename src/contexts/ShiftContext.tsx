@@ -64,7 +64,7 @@ const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
 
 export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(true);
 
   const [modalState, setModalState] = useState<ShiftModalState>({
     isOpen: false,
