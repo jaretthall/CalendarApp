@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Admin credentials
 const ADMIN_EMAIL = 'admin@clinicamedicos.org';
+const ADMIN_USERNAME = 'Admin';
 const ADMIN_PASSWORD = 'FamMed25!';
 
 // Read-only credentials for regular users
@@ -43,13 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Check if user is admin by email
       if (user && user.email) {
-        const admin = user.email === ADMIN_EMAIL;
+        const admin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+                      user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase();
         setIsAdmin(admin);
         console.log('Auth state changed:', { 
           email: user.email,
           isAdmin: admin,
-          shouldBeAdmin: user.email === ADMIN_EMAIL,
-          adminEmail: ADMIN_EMAIL
+          shouldBeAdmin: user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+                        user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase(),
+          adminEmail: ADMIN_EMAIL,
+          adminUsername: ADMIN_USERNAME
         });
       } else {
         setIsAdmin(false);
@@ -68,10 +72,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Special case for admin login
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        console.log('Attempting admin login with:', { email, adminEmail: ADMIN_EMAIL });
-        await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+      // Special case for admin login - allow both email and username
+      if ((email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+           email.toLowerCase() === ADMIN_USERNAME.toLowerCase()) && 
+          password === ADMIN_PASSWORD) {
+        console.log('Attempting admin login with:', { email, adminEmail: ADMIN_EMAIL, adminUsername: ADMIN_USERNAME });
+        // Always use the full email for Firebase auth
+        const adminEmailToUse = email.includes('@') ? email : `${ADMIN_USERNAME}@clinicamedicos.org`;
+        await signInWithEmailAndPassword(auth, adminEmailToUse, ADMIN_PASSWORD);
         return true;
       }
       

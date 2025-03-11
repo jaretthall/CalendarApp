@@ -18,27 +18,42 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Create admin user
-const email = 'admin@clinicamedicos.org';
+// Create admin users
+const adminEmailFull = 'admin@clinicamedicos.org';
+const adminUsernameEmail = 'Admin@clinicamedicos.org';
 const password = 'FamMed25!';
 
-createUserWithEmailAndPassword(auth, email, password)
-  .then((userCredential) => {
-    // User created successfully
+// Function to create a user and handle errors
+const createUser = async (email, password) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    console.log('Admin user created successfully:', user.uid);
-    console.log('Email:', email);
-    console.log('Password:', password);
-    process.exit(0);
-  })
-  .catch((error) => {
-    // Error creating user
-    console.error('Error creating admin user:', error.code, error.message);
+    console.log(`User created successfully with email ${email}:`, user.uid);
+    return true;
+  } catch (error) {
+    console.error(`Error creating user ${email}:`, error.code, error.message);
     
     // If error is because user already exists, show a different message
     if (error.code === 'auth/email-already-in-use') {
-      console.log('Admin user already exists. You can use the existing account to log in.');
+      console.log(`User ${email} already exists. You can use the existing account to log in.`);
     }
-    
-    process.exit(1);
-  }); 
+    return false;
+  }
+};
+
+// Create both admin users
+async function createAdminUsers() {
+  console.log('Creating admin users...');
+  
+  await createUser(adminEmailFull, password);
+  await createUser(adminUsernameEmail, password);
+  
+  console.log('Admin user creation process completed.');
+  console.log('You can log in with either:');
+  console.log(`1. Email: ${adminEmailFull}, Password: ${password}`);
+  console.log(`2. Username: Admin, Password: ${password}`);
+  
+  process.exit(0);
+}
+
+createAdminUsers(); 
