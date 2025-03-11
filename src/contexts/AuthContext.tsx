@@ -43,9 +43,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Check if user is admin by email
       if (user && user.email) {
-        setIsAdmin(user.email === ADMIN_EMAIL);
+        const admin = user.email === ADMIN_EMAIL;
+        setIsAdmin(admin);
+        console.log('Auth state changed:', { 
+          email: user.email,
+          isAdmin: admin,
+          shouldBeAdmin: user.email === ADMIN_EMAIL,
+          adminEmail: ADMIN_EMAIL
+        });
       } else {
         setIsAdmin(false);
+        console.log('Auth state changed: Not logged in or no email');
       }
       
       // Set read-only status
@@ -62,17 +70,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Special case for admin login
       if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        console.log('Attempting admin login with:', { email, adminEmail: ADMIN_EMAIL });
         await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
         return true;
       }
       
       // For read-only access with empty password, use the read-only account
       if (email.trim() !== '' && password === '') {
+        console.log('Attempting read-only login with blank password');
         await signInWithEmailAndPassword(auth, READ_ONLY_EMAIL, READ_ONLY_PASSWORD);
         return true;
       }
       
       // Regular login
+      console.log('Attempting regular login with:', { email });
       await signInWithEmailAndPassword(auth, email, password);
       return true;
     } catch (error) {

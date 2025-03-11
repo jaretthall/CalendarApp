@@ -34,11 +34,18 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const ProvidersSettings: React.FC = () => {
   const { providers, deleteProvider } = useProviders();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated, currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
   const navigate = useNavigate();
+
+  // Debug admin status
+  console.log('ProvidersSettings - Auth Status:', { 
+    isAdmin, 
+    isAuthenticated,
+    userEmail: currentUser?.email
+  });
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
