@@ -19,6 +19,7 @@
     "constants-browserify": "^1.0.0",
     "crypto-browserify": "^3.12.1",
     "date-fns": "^2.30.0",
+    "dotenv": "^16.4.7",
     "events": "^3.3.0",
     "firebase": "^11.4.0",
     "html2canvas": "^1.4.1",

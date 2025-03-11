@@ -1,16 +1,17 @@
 // Script to create a test user in Firebase Authentication
 const { initializeApp } = require('firebase/app');
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth');
+require('dotenv').config();
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyC8HbeEYkFb99Av6lA4uBGPdgSRtMHHMEo",
-  authDomain: "calendarapp-1148.firebaseapp.com",
-  projectId: "calendarapp-1148",
-  storageBucket: "calendarapp-1148.firebasestorage.app",
-  messagingSenderId: "48561938511",
-  appId: "1:48561938511:web:78aee1298a65a050510a3a",
-  measurementId: "G-S19CRE4XM8"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-S19CRE4XM8"
 };
 
 // Initialize Firebase
