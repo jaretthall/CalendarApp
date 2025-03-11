@@ -430,14 +430,27 @@ class FirestoreService {
     errorMessage?: string 
   }): Promise<boolean> {
     try {
-      await addDoc(collection(firestore, SYNC_LOGS_COLLECTION), {
+      // Create a clean object without undefined values
+      const logData: any = {
         syncType,
         status,
-        fileName: details.fileName,
-        recordsProcessed: details.recordsProcessed,
-        errorMessage: details.errorMessage,
         syncedAt: serverTimestamp()
-      });
+      };
+      
+      // Only add properties that are defined
+      if (details.fileName !== undefined) {
+        logData.fileName = details.fileName;
+      }
+      
+      if (details.recordsProcessed !== undefined) {
+        logData.recordsProcessed = details.recordsProcessed;
+      }
+      
+      if (details.errorMessage !== undefined) {
+        logData.errorMessage = details.errorMessage;
+      }
+      
+      await addDoc(collection(firestore, SYNC_LOGS_COLLECTION), logData);
       
       return true;
     } catch (error) {

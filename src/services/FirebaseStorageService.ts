@@ -77,12 +77,17 @@ class FirebaseStorageService {
     try {
       // Ensure user is authenticated
       if (!auth.currentUser) {
+        console.error("User not authenticated when trying to export data");
         return {
           success: false,
           message: "User not authenticated",
           timestamp: new Date().toISOString()
         };
       }
+      
+      // Get token to verify authentication
+      const token = await auth.currentUser.getIdToken();
+      console.log("User authenticated with token for export:", token ? "Valid token" : "No token");
       
       const fileName = `calendar_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
       const filePath = `${this.calendarFolderPath}/${fileName}`;
@@ -94,28 +99,44 @@ class FirebaseStorageService {
       // Convert string to Blob
       const blob = new Blob([jsonData], { type: 'application/json' });
       
-      // Upload to Firebase Storage with metadata
-      await uploadBytes(fileRef, blob, {
-        contentType: 'application/json',
-        customMetadata: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-        }
-      });
+      try {
+        // Upload to Firebase Storage with metadata
+        await uploadBytes(fileRef, blob, {
+          contentType: 'application/json',
+          customMetadata: {
+            'uploaded-by': auth.currentUser.uid,
+            'uploaded-at': new Date().toISOString(),
+            'content-type': 'application/json'
+          }
+        });
+        
+        console.log(`File ${fileName} uploaded successfully`);
+        
+        return {
+          success: true,
+          message: "Data exported to Firebase Storage successfully",
+          timestamp: new Date().toISOString(),
+          recordsProcessed: data.shifts ? data.shifts.length : 0,
+          fileName
+        };
+      } catch (storageError: any) {
+        const errorCode = storageError.code || 'unknown';
+        const errorMessage = storageError.message || 'Unknown error';
+        console.error(`Firebase Storage error during export (${errorCode}):`, errorMessage);
+        
+        return {
+          success: false,
+          message: `Error exporting to Firebase Storage: ${errorMessage} (${errorCode})`,
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || "Unknown error";
+      console.error("Error exporting data to Firebase Storage:", error);
       
       return {
-        success: true,
-        message: "Data exported to Firebase Storage successfully",
-        timestamp: new Date().toISOString(),
-        recordsProcessed: data.shifts ? data.shifts.length : 0,
-        fileName
-      };
-    } catch (error: any) {
-      console.error("Error exporting to Firebase Storage:", error);
-      return {
         success: false,
-        message: `Error exporting to Firebase Storage: ${error.message || "Unknown error"}`,
+        message: `Error exporting data: ${errorMessage}`,
         timestamp: new Date().toISOString()
       };
     }
@@ -256,7 +277,7 @@ class FirebaseStorageService {
     }
   }
 
-  // Create a backup of the calendar data
+  // Create a backup of the data
   async createBackup(data: any): Promise<SyncResult> {
     if (!this.isInitialized) {
       return {
@@ -269,12 +290,17 @@ class FirebaseStorageService {
     try {
       // Ensure user is authenticated
       if (!auth.currentUser) {
+        console.error("User not authenticated when trying to create backup");
         return {
           success: false,
           message: "User not authenticated",
           timestamp: new Date().toISOString()
         };
       }
+      
+      // Get token to verify authentication
+      const token = await auth.currentUser.getIdToken();
+      console.log("User authenticated with token for backup:", token ? "Valid token" : "No token");
       
       const fileName = `backup_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.json`;
       const filePath = `${this.backupFolderPath}/${fileName}`;
@@ -286,28 +312,45 @@ class FirebaseStorageService {
       // Convert string to Blob
       const blob = new Blob([jsonData], { type: 'application/json' });
       
-      // Upload to Firebase Storage with metadata
-      await uploadBytes(fileRef, blob, {
-        contentType: 'application/json',
-        customMetadata: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-        }
-      });
+      try {
+        // Upload to Firebase Storage with metadata
+        await uploadBytes(fileRef, blob, {
+          contentType: 'application/json',
+          customMetadata: {
+            'uploaded-by': auth.currentUser.uid,
+            'uploaded-at': new Date().toISOString(),
+            'content-type': 'application/json',
+            'backup-type': 'manual'
+          }
+        });
+        
+        console.log(`Backup ${fileName} created successfully`);
+        
+        return {
+          success: true,
+          message: "Backup created successfully",
+          timestamp: new Date().toISOString(),
+          recordsProcessed: data.shifts ? data.shifts.length : 0,
+          fileName
+        };
+      } catch (storageError: any) {
+        const errorCode = storageError.code || 'unknown';
+        const errorMessage = storageError.message || 'Unknown error';
+        console.error(`Firebase Storage error during backup (${errorCode}):`, errorMessage);
+        
+        return {
+          success: false,
+          message: `Error creating backup: ${errorMessage} (${errorCode})`,
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || "Unknown error";
+      console.error("Error creating backup:", error);
       
       return {
-        success: true,
-        message: "Backup created in Firebase Storage successfully",
-        timestamp: new Date().toISOString(),
-        recordsProcessed: data.shifts ? data.shifts.length : 0,
-        fileName
-      };
-    } catch (error: any) {
-      console.error("Error creating backup in Firebase Storage:", error);
-      return {
         success: false,
-        message: `Error creating backup: ${error.message || "Unknown error"}`,
+        message: `Error creating backup: ${errorMessage}`,
         timestamp: new Date().toISOString()
       };
     }
@@ -325,90 +368,85 @@ class FirebaseStorageService {
         }
       };
     }
-
+    
     try {
-      // For development environment, return mock data to avoid CORS issues
-      if (this.isLocalhost) {
-        console.log('Using mock backup data in development environment');
-        
-        // Generate some mock backup files
-        const mockFiles = [
-          {
-            name: `backup_${format(new Date(), "yyyy-MM-dd")}_10-30-00.json`,
-            lastModified: new Date().toISOString(),
-            size: 1024 * 10 // 10KB
-          },
-          {
-            name: `backup_${format(new Date(Date.now() - 86400000), "yyyy-MM-dd")}_15-45-00.json`, // Yesterday
-            lastModified: new Date(Date.now() - 86400000).toISOString(),
-            size: 1024 * 8 // 8KB
-          },
-          {
-            name: `backup_${format(new Date(Date.now() - 86400000 * 2), "yyyy-MM-dd")}_09-15-00.json`, // 2 days ago
-            lastModified: new Date(Date.now() - 86400000 * 2).toISOString(),
-            size: 1024 * 12 // 12KB
-          }
-        ];
-        
-        return {
-          files: mockFiles,
-          result: {
-            success: true,
-            message: "Mock backup files retrieved successfully",
-            timestamp: new Date().toISOString()
-          }
-        };
-      }
-      
-      // For production, use the actual Firebase Storage
-      const folderRef = ref(storage, this.backupFolderPath);
-      const filesList = await listAll(folderRef);
-      
-      if (filesList.items.length === 0) {
+      // Ensure user is authenticated
+      if (!auth.currentUser) {
+        console.error("User not authenticated when trying to access backups");
         return {
           files: [],
           result: {
-            success: true,
-            message: "No backup files found in Firebase Storage",
+            success: false,
+            message: "User not authenticated",
             timestamp: new Date().toISOString()
           }
         };
       }
       
-      // Get metadata for all files
-      const filesWithMetadata = await Promise.all(
-        filesList.items.map(async (fileRef) => {
-          const metadata = await getMetadata(fileRef);
-          return {
-            name: fileRef.name,
-            lastModified: metadata.updated,
-            size: metadata.size
-          };
-        })
-      );
+      // Get token to verify authentication
+      const token = await auth.currentUser.getIdToken();
+      console.log("User authenticated with token:", token ? "Valid token" : "No token");
       
-      // Sort by updated date (newest first)
-      filesWithMetadata.sort((a, b) => 
-        new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
-      );
+      const folderRef = ref(storage, this.backupFolderPath);
       
-      return {
-        files: filesWithMetadata,
-        result: {
-          success: true,
-          message: "Backup files retrieved from Firebase Storage successfully",
-          timestamp: new Date().toISOString()
-        }
-      };
+      try {
+        const result = await listAll(folderRef);
+        
+        // Process files
+        const filesPromises = result.items.map(async (item) => {
+          try {
+            const metadata = await getMetadata(item);
+            return {
+              name: item.name,
+              lastModified: metadata.timeCreated,
+              size: metadata.size
+            };
+          } catch (metadataError: any) {
+            console.error(`Error getting metadata for ${item.name}:`, metadataError);
+            return {
+              name: item.name,
+              lastModified: new Date().toISOString(),
+              size: 0
+            };
+          }
+        });
+        
+        const files = await Promise.all(filesPromises);
+        
+        // Sort files by lastModified (newest first)
+        files.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+        
+        return {
+          files,
+          result: {
+            success: true,
+            message: "Backups retrieved successfully",
+            timestamp: new Date().toISOString()
+          }
+        };
+      } catch (storageError: any) {
+        const errorCode = storageError.code || 'unknown';
+        const errorMessage = storageError.message || 'Unknown error';
+        console.error(`Firebase Storage error (${errorCode}):`, errorMessage);
+        
+        return {
+          files: [],
+          result: {
+            success: false,
+            message: `Error getting available backups: ${errorMessage} (${errorCode})`,
+            timestamp: new Date().toISOString()
+          }
+        };
+      }
     } catch (error: any) {
-      console.error("Error getting available backups from Firebase Storage:", error);
+      const errorMessage = error.message || "Unknown error";
+      console.error("Error getting available backups:", error);
       
-      // Return empty array with error message
       return {
         files: [],
         result: {
           success: false,
-          message: `Error getting available backups: ${error.message || "Unknown error"}`,
+          message: `Error getting available backups: ${errorMessage}`,
           timestamp: new Date().toISOString()
         }
       };
