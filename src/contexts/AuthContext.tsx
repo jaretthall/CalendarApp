@@ -21,7 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Admin user emails - replace with your actual admin emails
-const ADMIN_EMAILS = ['admin@example.com', 'jaretthall@example.com'];
+const ADMIN_EMAILS = ['tiffanygood@clinicamedicos.org', 'jarett@clinicamedicos.org'];
 
 // Temp read-only user for testing
 const READ_ONLY_EMAIL = 'readonly@example.com';
