@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import firebaseStorageService from './FirebaseStorageService';
 import databaseService from './DatabaseService';
 import { auth } from '../config/firebase-config';
