@@ -281,15 +281,19 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     try {
+      // Now we know shiftToUpdate is defined
+      const seriesId = shiftToUpdate.seriesId;
+      const isRecurring = shiftToUpdate.isRecurring;
+      
       // If this is part of a recurring series and we're updating the entire series
-      if (shiftToUpdate.seriesId && shiftToUpdate.isRecurring && updateSeries) {
-        console.log('Updating entire recurring series:', shiftToUpdate.seriesId);
+      if (seriesId && isRecurring && updateSeries) {
+        console.log('Updating entire recurring series:', seriesId);
         
         // Get all shifts in this series
-        const seriesShifts = shifts.filter(s => s.seriesId === shiftToUpdate.seriesId);
+        const seriesShifts = shifts.filter(s => s.seriesId === seriesId);
         
         if (seriesShifts.length === 0) {
-          console.error('No shifts found in series:', shiftToUpdate.seriesId);
+          console.error('No shifts found in series:', seriesId);
           return;
         }
         
@@ -309,7 +313,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (needsRecalculation) {
           try {
             // Remove all existing shifts in the series
-            const nonSeriesShifts = shifts.filter(s => s.seriesId !== shiftToUpdate.seriesId);
+            const nonSeriesShifts = shifts.filter(s => s.seriesId !== seriesId);
             
             // Create a new base shift with updated properties
             const baseShift: Omit<Shift, 'id'> = {
@@ -444,7 +448,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Update local state
           setShifts(
             shifts.map(shift => 
-              shift.seriesId === shiftToUpdate.seriesId 
+              shift.seriesId === seriesId 
                 ? { ...shift, ...updatedShift } 
                 : shift
             )
@@ -452,7 +456,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       } else {
         // If this is part of a recurring series but we're only updating this instance
-        if (shiftToUpdate.seriesId && shiftToUpdate.isRecurring && !updateSeries) {
+        if (seriesId && isRecurring && !updateSeries) {
           console.log('Updating single shift in recurring pattern - breaking from series');
           
           // Create a copy without the series ID to break it from the pattern
@@ -536,17 +540,20 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     try {
-      if (deleteSeries && shiftToDelete.seriesId) {
+      // Now we know shiftToDelete is defined
+      const seriesId = shiftToDelete.seriesId;
+      
+      if (deleteSeries && seriesId) {
         // Delete all shifts in the series from the database first
-        const shiftsToDelete = shifts.filter(s => s.seriesId === shiftToDelete.seriesId);
-        console.log('Deleting all shifts in series:', shiftToDelete.seriesId, shiftsToDelete.length, 'shifts');
+        const shiftsToDelete = shifts.filter(s => s.seriesId === seriesId);
+        console.log('Deleting all shifts in series:', seriesId, shiftsToDelete.length, 'shifts');
         
         for (const shift of shiftsToDelete) {
           await databaseService.deleteShift(shift.id);
         }
         
         // Then update local state
-        setShifts(shifts.filter(shift => shift.seriesId !== shiftToDelete.seriesId));
+        setShifts(shifts.filter(shift => shift.seriesId !== seriesId));
       } else {
         // Delete only this shift from the database first
         console.log('Deleting single shift:', id);
@@ -556,13 +563,13 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const updatedShifts = shifts.filter(shift => shift.id !== id);
         
         // If this was part of a series, handle series cleanup
-        if (shiftToDelete.seriesId) {
+        if (seriesId) {
           const remainingSeriesShifts = shifts.filter(
-            shift => shift.seriesId === shiftToDelete.seriesId && shift.id !== id
+            shift => shift.seriesId === seriesId && shift.id !== id
           );
           
           if (remainingSeriesShifts.length === 0) {
-            console.log('Last shift in series deleted, cleaning up series:', shiftToDelete.seriesId);
+            console.log('Last shift in series deleted, cleaning up series:', seriesId);
           } else if (remainingSeriesShifts.length === 1) {
             // If only one shift remains in the series, remove the series ID from it
             console.log('Only one shift remains in series, removing series ID');
