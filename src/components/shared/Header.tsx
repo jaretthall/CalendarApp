@@ -283,18 +283,6 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
             </IconButton>
           </Tooltip>
           
-          <Tooltip title="Previous">
-            <IconButton color="inherit">
-              <ArrowBack />
-            </IconButton>
-          </Tooltip>
-          
-          <Tooltip title="Next">
-            <IconButton color="inherit">
-              <ArrowForward />
-            </IconButton>
-          </Tooltip>
-          
           <Tooltip title="Export/Import">
             <Button 
               color="inherit" 
