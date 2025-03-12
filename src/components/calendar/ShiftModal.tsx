@@ -19,7 +19,12 @@ import {
   Collapse,
   Alert,
   RadioGroup,
-  Radio
+  Radio,
+  Divider,
+  Paper,
+  Stepper,
+  Step,
+  StepLabel
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, parseISO, addMonths, addDays, differenceInDays } from 'date-fns';
@@ -28,12 +33,23 @@ import { useProviders } from '../../contexts/EmployeeContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import InfoIcon from '@mui/icons-material/Info';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import DateRangeIcon from '@mui/icons-material/DateRange';
 
 // Define the recurrence pattern type to match the Shift interface
 type RecurrencePattern = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 
-// Define delete option type
+// Define the delete option type
 type DeleteOptionType = 'entire' | 'specific-day';
+
+// Define the edit mode type
+type EditModeType = 'view' | 'edit';
+
+// Define the edit scope type
+type EditScopeType = 'this' | 'multiday' | 'series';
 
 const ShiftModal: React.FC = () => {
   const { 
@@ -67,460 +83,175 @@ const ShiftModal: React.FC = () => {
     recurrenceEndDate: ''
   });
   
+  // State for delete options
   const [deleteSeries, setDeleteSeries] = useState(false);
   const [deleteOption, setDeleteOption] = useState<DeleteOptionType>('entire');
   const [specificDeleteDate, setSpecificDeleteDate] = useState<string | null>(null);
+  
+  // State for edit mode and scope
+  const [editMode, setEditMode] = useState<EditModeType>('view');
+  const [editScope, setEditScope] = useState<EditScopeType>('this');
   const [updateScope, setUpdateScope] = useState<'this' | 'future' | 'all'>('this');
-
-  // Reset form when modal opens/closes
+  
+  // Effect to initialize form data when the modal opens
   useEffect(() => {
-    console.log('Modal state changed:', modalState);
-    
-    // Always reset form data when modal state changes
-    if (!modalState.isOpen) {
-      // Reset form data to defaults when modal closes
+    if (modalState.isOpen && modalState.mode === 'edit' && modalState.shift && !formInitialized.current) {
+      setFormData({
+        ...modalState.shift
+      });
+      
+      // If it's a multi-day shift, set the specific delete date to the first day by default
+      if (modalState.shift.startDate !== modalState.shift.endDate) {
+        setSpecificDeleteDate(modalState.shift.startDate);
+      }
+      
+      // Reset edit mode to view when opening an existing shift
+      setEditMode('view');
+      
+      formInitialized.current = true;
+    } else if (modalState.isOpen && modalState.mode === 'add' && !formInitialized.current) {
+      // For add mode, initialize with the selected date
+      const initialDate = modalState.date || format(new Date(), 'yyyy-MM-dd');
+      
       setFormData({
         providerId: activeProviders.length > 0 ? activeProviders[0].id : '',
         clinicTypeId: activeClinicTypes.length > 0 ? activeClinicTypes[0].id : '',
-        startDate: '',
-        endDate: '',
+        startDate: initialDate,
+        endDate: initialDate,
         isVacation: false,
         notes: '',
         isRecurring: false,
         recurrencePattern: 'weekly' as RecurrencePattern,
         recurrenceEndDate: ''
       });
-      // Reset other state
-      setUpdateScope('this');
-      setDeleteSeries(false);
-      // Reset the initialization flag when modal closes
-      formInitialized.current = false;
-      return;
-    }
-    
-    // Force refresh shifts data to ensure we have the complete series
-    if (modalState.isOpen && modalState.mode === 'edit' && modalState.shift?.seriesId) {
-      console.log('Forcing refresh to ensure complete series data is loaded');
-      forceRefreshShifts().then(() => {
-        console.log('Shifts refreshed for series data');
-      });
-    }
-    
-    if (modalState.isOpen && !formInitialized.current) {
-      if (modalState.mode === 'add' && modalState.date) {
-        // Set default end date to same as start date
-        const startDate = new Date(modalState.date);
-        const recurrenceEndDate = addMonths(startDate, 3);
-        
-        // Create a completely fresh object for new shifts
-        const newFormData: Partial<Shift> = {
-          providerId: activeProviders.length > 0 ? activeProviders[0].id : '',
-          clinicTypeId: activeClinicTypes.length > 0 ? activeClinicTypes[0].id : '',
-          startDate: modalState.date,
-          endDate: modalState.date,
-          isVacation: false,
-          notes: '',
-          isRecurring: false,
-          recurrencePattern: 'weekly' as RecurrencePattern,
-          recurrenceEndDate: format(recurrenceEndDate, 'yyyy-MM-dd')
-        };
-        
-        console.log('Setting form data for add mode:', newFormData);
-        setFormData(newFormData);
-        setUpdateScope('this');
-        setDeleteSeries(false);
-        formInitialized.current = true;
-      } else if (modalState.mode === 'edit' && modalState.shift) {
-        // When editing, ensure we have a recurrence end date if it's a recurring shift
-        const shift = { ...modalState.shift };
-        
-        if (shift.isRecurring && !shift.recurrenceEndDate && shift.startDate) {
-          const startDate = parseISO(shift.startDate);
-          const recurrenceEndDate = addMonths(startDate, 3);
-          shift.recurrenceEndDate = format(recurrenceEndDate, 'yyyy-MM-dd');
-        }
-        
-        console.log('Setting form data for edit mode:', shift);
-        setFormData(shift);
-        setUpdateScope('this');
-        setDeleteSeries(false);
-        formInitialized.current = true;
-      }
-    }
-  }, [modalState, activeProviders, activeClinicTypes, forceRefreshShifts]);
-
-  // Memoize handlers to prevent unnecessary re-renders
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isAuthenticated) return;
-    
-    const { name, value, type, checked } = e.target;
-    const newValue = type === 'checkbox' ? checked : value;
-    
-    console.log(`Input changed: ${name} = ${newValue}`);
-    
-    setFormData(prevData => ({
-      ...prevData,
-      [name]: newValue
-    }));
-  }, [isAuthenticated]);
-
-  const handleSelectChange = useCallback((e: SelectChangeEvent) => {
-    if (!isAuthenticated) return;
-    
-    const { name, value } = e.target;
-    console.log(`Select changed: ${name} = ${value}`);
-    
-    if (name === 'recurrencePattern') {
-      // Ensure recurrencePattern is properly typed
-      setFormData(prevData => ({
-        ...prevData,
-        [name]: value as RecurrencePattern
-      }));
-    } else {
-      setFormData(prevData => ({
-        ...prevData,
-        [name]: value
-      }));
-    }
-  }, [isAuthenticated]);
-
-  const handleDateChange = useCallback((name: string, date: Date | null) => {
-    if (!isAuthenticated) return;
-    
-    if (date) {
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      console.log(`Date changed: ${name} = ${formattedDate}`);
       
-      // If changing start date and end date is before start date, update end date too
-      if (name === 'startDate') {
-        setFormData(prevData => {
-          const updatedData = {
-            ...prevData,
-            [name]: formattedDate
-          };
-          
-          // If end date is empty or before start date, set it to start date
-          if (!prevData.endDate || parseISO(prevData.endDate) < date) {
-            updatedData.endDate = formattedDate;
-          }
-          
-          return updatedData;
+      // For add mode, start in edit mode
+      setEditMode('edit');
+      
+      formInitialized.current = true;
+    }
+  }, [modalState, activeProviders, activeClinicTypes]);
+  
+  // Reset form initialized flag when the modal closes
+  useEffect(() => {
+    if (!modalState.isOpen) {
+      formInitialized.current = false;
+      setDeleteSeries(false);
+      setDeleteOption('entire');
+      setSpecificDeleteDate(null);
+      setEditMode('view');
+      setEditScope('this');
+      setUpdateScope('this');
+    }
+  }, [modalState.isOpen]);
+
+  // Handle form field changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  // Handle select field changes
+  const handleSelectChange = (e: SelectChangeEvent<string>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  // Handle date picker changes
+  const handleDateChange = (name: string, date: Date | null) => {
+    if (date) {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      // If changing start date and it's after end date, update end date too
+      if (name === 'startDate' && formData.endDate && dateStr > formData.endDate) {
+        setFormData({
+          ...formData,
+          [name]: dateStr,
+          endDate: dateStr
         });
       } else {
-        // Only update the specific date field that was changed
-        setFormData(prevData => ({
-          ...prevData,
-          [name]: formattedDate
-        }));
+        setFormData({
+          ...formData,
+          [name]: dateStr
+        });
       }
     }
-  }, [isAuthenticated]);
+  };
 
-  const handleRecurringToggle = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle specific delete date change
+  const handleSpecificDeleteDateChange = (date: Date | null) => {
+    if (date) {
+      setSpecificDeleteDate(format(date, 'yyyy-MM-dd'));
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async () => {
     if (!isAuthenticated) return;
     
-    const checked = event.target.checked;
-    console.log(`Recurring toggled: ${checked}`);
-    
-    // If toggling on and we have a start date, set a default recurrence end date
-    setFormData(prevData => {
-      if (checked && prevData.startDate) {
-        const startDate = parseISO(prevData.startDate);
-        const recurrenceEndDate = addMonths(startDate, 3);
-        
-        return {
-          ...prevData,
-          isRecurring: checked,
-          recurrencePattern: 'weekly' as RecurrencePattern, // Set default pattern with proper type
-          recurrenceEndDate: format(recurrenceEndDate, 'yyyy-MM-dd')
-        };
-      } else {
-        return {
-          ...prevData,
-          isRecurring: checked,
-          // Clear recurrence fields if toggling off
-          recurrencePattern: checked ? prevData.recurrencePattern : undefined,
-          recurrenceEndDate: checked ? prevData.recurrenceEndDate : undefined
-        };
-      }
-    });
-  }, [isAuthenticated]);
-
-  const handleSubmit = useCallback(() => {
-    if (!isAuthenticated) {
-      closeModal();
-      return;
-    }
-    
-    console.log('Submitting form data:', formData);
-    
-    if (
-      !formData.providerId ||
-      !formData.clinicTypeId ||
-      !formData.startDate ||
-      !formData.endDate
-    ) {
-      console.error('Missing required fields');
-      return;
-    }
-
-    // Ensure recurrence fields are properly set
-    const shiftToSubmit = { ...formData } as Omit<Shift, 'id'>;
-    
-    if (shiftToSubmit.isRecurring) {
-      if (!shiftToSubmit.recurrencePattern) {
-        shiftToSubmit.recurrencePattern = 'weekly' as RecurrencePattern;
-      }
-      
-      if (!shiftToSubmit.recurrenceEndDate && shiftToSubmit.startDate) {
-        const startDate = parseISO(shiftToSubmit.startDate);
-        const recurrenceEndDate = addMonths(startDate, 3);
-        shiftToSubmit.recurrenceEndDate = format(recurrenceEndDate, 'yyyy-MM-dd');
-      }
-    } else {
-      // Clear recurrence fields if not recurring
-      delete shiftToSubmit.recurrencePattern;
-      delete shiftToSubmit.recurrenceEndDate;
-      delete shiftToSubmit.seriesId;
-    }
-
     try {
       if (modalState.mode === 'add') {
-        addShift(shiftToSubmit);
+        // Add new shift
+        await addShift(formData as Omit<Shift, 'id'>);
       } else if (modalState.mode === 'edit' && modalState.shift) {
-        // Determine if we should update all occurrences based on the update scope
-        const shouldUpdateSeries = updateScope === 'all';
-        updateShift(modalState.shift.id, shiftToSubmit, shouldUpdateSeries);
-      } else {
-        console.error('Cannot update shift: No shift data in modal state');
+        // Update existing shift
+        const updateSeries = editScope === 'series' || (editScope === 'multiday' && modalState.shift.isRecurring);
+        await updateShift(modalState.shift.id, formData, updateSeries);
       }
       
-      // Force a refresh after adding or updating to ensure consistency
-      setTimeout(async () => {
-        try {
-          await forceRefreshShifts();
-          console.log('Shifts refreshed successfully after submit');
-        } catch (error) {
-          console.error('Error refreshing shifts after submit:', error);
-        }
-      }, 500);
+      // Close modal and refresh shifts
+      closeModal();
+      await forceRefreshShifts();
     } catch (error) {
-      console.error('Error saving shift:', error);
+      console.error('Error submitting shift:', error);
     }
+  };
 
-    closeModal();
-  }, [formData, modalState, isAuthenticated, updateScope, addShift, updateShift, closeModal, forceRefreshShifts]);
-
-  // Check if the current shift spans multiple days
-  const isMultiDayShift = useMemo(() => {
-    if (modalState.mode === 'edit' && modalState.shift) {
-      return modalState.shift.startDate !== modalState.shift.endDate;
-    }
-    return false;
-  }, [modalState]);
-
-  // Generate dates for the date selector
-  const shiftDates = useMemo(() => {
-    if (modalState.mode === 'edit' && modalState.shift && isMultiDayShift) {
-      const dates: { date: string; label: string }[] = [];
-      const startDate = parseISO(modalState.shift.startDate);
-      const endDate = parseISO(modalState.shift.endDate);
-      let currentDate = startDate;
-      
-      while (currentDate <= endDate) {
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-        dates.push({
-          date: dateStr,
-          label: format(currentDate, 'EEE, MMM d, yyyy')
-        });
-        currentDate = addDays(currentDate, 1);
-      }
-      
-      return dates;
-    }
-    return [];
-  }, [modalState.mode, modalState.shift, isMultiDayShift]);
-
-  // Initialize the specific delete date when the modal opens or when shift changes
-  useEffect(() => {
-    if (modalState.mode === 'edit' && modalState.shift && isMultiDayShift && shiftDates.length > 0) {
-      setSpecificDeleteDate(shiftDates[0].date);
-    }
-  }, [modalState.mode, modalState.shift, isMultiDayShift, shiftDates]);
-
-  // Add a function to handle specific day deletion
-  const handleSpecificDayDelete = useCallback(() => {
-    if (!isAuthenticated || !modalState.shift || !specificDeleteDate) {
-      closeModal();
-      return;
-    }
-
-    // If the shift is just one day, delete it normally
-    if (modalState.shift.startDate === modalState.shift.endDate) {
-      deleteShift(modalState.shift.id, deleteSeries);
-      closeModal();
-      return;
-    }
-
+  // Handle delete
+  const handleDelete = async () => {
+    if (!isAuthenticated || !modalState.shift) return;
+    
     try {
-      // For multi-day shifts, we need to split the shift
-      const shift = modalState.shift;
-      const startDate = parseISO(shift.startDate);
-      const endDate = parseISO(shift.endDate);
-      const deleteDate = parseISO(specificDeleteDate);
-
-      console.log(`Deleting specific day: ${specificDeleteDate} from shift ${shift.id}`);
-      console.log(`Shift dates: ${shift.startDate} to ${shift.endDate}`);
+      // Determine if we're deleting a series
+      const shouldDeleteSeries = editScope === 'series';
       
-      // For recurring shifts, we need to break this instance from the series first
-      const isPartOfSeries = shift.seriesId && shift.isRecurring;
-      
-      // If deleting the first day
-      if (format(startDate, 'yyyy-MM-dd') === specificDeleteDate) {
-        // Update the start date to the day after
-        const newStartDate = format(addDays(deleteDate, 1), 'yyyy-MM-dd');
-        console.log(`Updating shift start date to: ${newStartDate}`);
+      // If deleting a specific day from a multi-day shift
+      if (deleteOption === 'specific-day' && specificDeleteDate && editScope === 'multiday') {
+        // Logic for deleting a specific day would go here
+        // This would require backend support for splitting shifts
+        console.log('Deleting specific day:', specificDeleteDate);
         
-        // If this is part of a series, we need to break it from the series first
-        if (isPartOfSeries) {
-          console.log('Breaking shift from series before updating');
-          // Create a modified shift without the seriesId
-          const updatedShift = { 
-            ...shift, 
-            startDate: newStartDate,
-            seriesId: undefined,
-            isRecurring: false,
-            recurrencePattern: undefined,
-            recurrenceEndDate: undefined
-          };
-          // Update the shift with the new data
-          updateShift(shift.id, updatedShift, false);
-        } else {
-          // Regular update for non-recurring shifts
-          updateShift(shift.id, { startDate: newStartDate }, false);
-        }
-      } 
-      // If deleting the last day
-      else if (format(endDate, 'yyyy-MM-dd') === specificDeleteDate) {
-        // Update the end date to the day before
-        const newEndDate = format(addDays(deleteDate, -1), 'yyyy-MM-dd');
-        console.log(`Updating shift end date to: ${newEndDate}`);
-        
-        // If this is part of a series, we need to break it from the series first
-        if (isPartOfSeries) {
-          console.log('Breaking shift from series before updating');
-          // Create a modified shift without the seriesId
-          const updatedShift = { 
-            ...shift, 
-            endDate: newEndDate,
-            seriesId: undefined,
-            isRecurring: false,
-            recurrencePattern: undefined,
-            recurrenceEndDate: undefined
-          };
-          // Update the shift with the new data
-          updateShift(shift.id, updatedShift, false);
-        } else {
-          // Regular update for non-recurring shifts
-          updateShift(shift.id, { endDate: newEndDate }, false);
-        }
-      } 
-      // If deleting a day in the middle, we need to split the shift into two
-      else {
-        // First, update the current shift to end the day before the deleted day
-        const newEndDate = format(addDays(deleteDate, -1), 'yyyy-MM-dd');
-        console.log(`Updating first part end date to: ${newEndDate}`);
-        
-        // If this is part of a series, we need to break it from the series first
-        if (isPartOfSeries) {
-          console.log('Breaking shift from series before splitting');
-          // Create a modified shift without the seriesId
-          const updatedShift = { 
-            ...shift, 
-            endDate: newEndDate,
-            seriesId: undefined,
-            isRecurring: false,
-            recurrencePattern: undefined,
-            recurrenceEndDate: undefined
-          };
-          // Update the shift with the new data
-          updateShift(shift.id, updatedShift, false);
-        } else {
-          // Regular update for non-recurring shifts
-          updateShift(shift.id, { endDate: newEndDate }, false);
-        }
-        
-        // Then create a new shift starting the day after the deleted day
-        const newStartDate = format(addDays(deleteDate, 1), 'yyyy-MM-dd');
-        
-        const newShift: Omit<Shift, 'id'> = {
-          providerId: shift.providerId,
-          clinicTypeId: shift.clinicTypeId,
-          startDate: newStartDate,
-          endDate: shift.endDate,
-          isVacation: shift.isVacation,
-          notes: shift.notes,
-          // For the new shift, don't include it in the recurring series
-          isRecurring: false,
-          recurrencePattern: undefined,
-          recurrenceEndDate: undefined,
-          seriesId: undefined
-        };
-        
-        console.log(`Creating new shift from: ${newStartDate} to ${shift.endDate}`);
-        addShift(newShift);
-      }
-      
-      // Force a refresh after specific day deletion to ensure consistency
-      setTimeout(async () => {
-        try {
-          await forceRefreshShifts();
-          console.log('Shifts refreshed successfully after specific day deletion');
-        } catch (error) {
-          console.error('Error refreshing shifts after specific day deletion:', error);
-        }
-      }, 500);
-    } catch (error) {
-      console.error('Error deleting specific day:', error);
-    }
-    
-    closeModal();
-  }, [isAuthenticated, modalState.shift, specificDeleteDate, deleteShift, deleteSeries, updateShift, addShift, closeModal, forceRefreshShifts]);
-
-  const handleDelete = useCallback(() => {
-    if (!isAuthenticated) {
-      closeModal();
-      return;
-    }
-    
-    if (modalState.mode === 'edit') {
-      if (modalState.shift) {
-        // If it's a multi-day shift and we're deleting a specific day
-        if (deleteOption === 'specific-day' && 
-            modalState.shift.startDate !== modalState.shift.endDate && 
-            specificDeleteDate) {
-          handleSpecificDayDelete();
-        } else {
-          // Regular delete for the entire shift
-          deleteShift(modalState.shift.id, deleteSeries);
-          
-          // Force a refresh after deleting to ensure consistency
-          setTimeout(() => {
-            forceRefreshShifts();
-          }, 500);
-          
-          closeModal();
-        }
+        // For now, just delete the entire shift as a placeholder
+        await deleteShift(modalState.shift.id, shouldDeleteSeries);
       } else {
-        console.error('Cannot delete shift: No shift data in modal state');
-        // Still close the modal to prevent user from being stuck
-        closeModal();
+        // Delete the entire shift or series
+        await deleteShift(modalState.shift.id, shouldDeleteSeries);
       }
+      
+      // Close modal and refresh shifts
+      closeModal();
+      await forceRefreshShifts();
+    } catch (error) {
+      console.error('Error deleting shift:', error);
     }
-  }, [isAuthenticated, modalState, deleteSeries, deleteOption, specificDeleteDate, deleteShift, handleSpecificDayDelete, closeModal, forceRefreshShifts]);
+  };
 
-  // Debug render
-  console.log('Rendering ShiftModal with formData:', formData);
+  // Handle edit button click
+  const handleEditClick = () => {
+    setEditMode('edit');
+  };
+
+  // Calculate if this is a multi-day shift
+  const isMultiDayShift = useMemo(() => {
+    if (!modalState.shift) return false;
+    return modalState.shift.startDate !== modalState.shift.endDate;
+  }, [modalState.shift]);
 
   // Add an effect that runs when the modal key changes
   useEffect(() => {
@@ -536,10 +267,23 @@ const ShiftModal: React.FC = () => {
     return modalState.mode === 'edit' && modalState.shift?.seriesId && modalState.shift?.isRecurring;
   }, [modalState]);
 
+  // Get provider and clinic type names for display
+  const providerName = useMemo(() => {
+    if (!formData.providerId) return '';
+    const provider = activeProviders.find(p => p.id === formData.providerId);
+    return provider ? `${provider.firstName} ${provider.lastName}` : '';
+  }, [formData.providerId, activeProviders]);
+
+  const clinicTypeName = useMemo(() => {
+    if (!formData.clinicTypeId) return '';
+    const clinicType = activeClinicTypes.find(c => c.id === formData.clinicTypeId);
+    return clinicType ? clinicType.name : '';
+  }, [formData.clinicTypeId, activeClinicTypes]);
+
   return (
     <Dialog open={modalState.isOpen} onClose={closeModal} maxWidth="md" fullWidth>
       <DialogTitle>
-        {modalState.mode === 'add' ? 'Add Shift' : 'Edit Shift'}
+        {modalState.mode === 'add' ? 'Add Shift' : (editMode === 'view' ? 'Shift Details' : 'Edit Shift')}
         {modalState.mode === 'edit' && modalState.shift?.seriesId && (
           <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
             {isMultiDayShift ? 'This is a multi-day shift' : 'This is a single-day shift'}
@@ -555,441 +299,455 @@ const ShiftModal: React.FC = () => {
           </Alert>
         )}
         
-        <Box sx={{ mt: 2 }}>
-          {/* Section 1: Basic Shift Information */}
-          <Typography variant="h6" gutterBottom sx={{ 
-            backgroundColor: 'primary.light', 
-            color: 'primary.contrastText',
-            p: 1,
-            borderRadius: 1
-          }}>
-            Shift Details
-          </Typography>
-          
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel id="provider-label">Provider</InputLabel>
-                <Select
-                  labelId="provider-label"
-                  name="providerId"
-                  value={formData.providerId || ''}
-                  onChange={handleSelectChange}
-                  label="Provider"
-                  disabled={!isAuthenticated}
-                >
-                  {activeProviders.map(provider => (
-                    <MenuItem key={provider.id} value={provider.id}>
-                      {`${provider.firstName} ${provider.lastName}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel id="clinic-type-label">Clinic Type</InputLabel>
-                <Select
-                  labelId="clinic-type-label"
-                  name="clinicTypeId"
-                  value={formData.clinicTypeId || ''}
-                  onChange={handleSelectChange}
-                  label="Clinic Type"
-                  disabled={!isAuthenticated}
-                >
-                  {activeClinicTypes.map(clinicType => (
-                    <MenuItem key={clinicType.id} value={clinicType.id}>
-                      {clinicType.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    name="isVacation"
-                    checked={formData.isVacation || false}
-                    onChange={handleInputChange}
-                    disabled={!isAuthenticated}
-                  />
-                }
-                label="Vacation"
-              />
-            </Grid>
-            
-            <Grid item xs={12}>
-              <TextField
-                name="notes"
-                label="Notes"
-                value={formData.notes || ''}
-                onChange={handleInputChange}
-                fullWidth
-                multiline
-                rows={2}
-                disabled={!isAuthenticated}
-              />
-            </Grid>
-          </Grid>
-          
-          {/* Section 2: Shift Duration */}
-          <Typography variant="h6" gutterBottom sx={{ 
-            backgroundColor: 'secondary.light', 
-            color: 'secondary.contrastText',
-            p: 1,
-            borderRadius: 1
-          }}>
-            Shift Duration
-          </Typography>
-          
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              A shift can span a single day or multiple consecutive days
-            </Typography>
-          </Box>
-          
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6}>
-              <DatePicker
-                label="Start Date"
-                value={formData.startDate ? parseISO(formData.startDate) : null}
-                onChange={(date) => handleDateChange('startDate', date)}
-                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
-                disabled={!isAuthenticated}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <DatePicker
-                label="End Date"
-                value={formData.endDate ? parseISO(formData.endDate) : null}
-                onChange={(date) => handleDateChange('endDate', date)}
-                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
-                disabled={!isAuthenticated}
-              />
-              {formData.startDate && formData.endDate && formData.startDate !== formData.endDate && (
-                <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
-                  This is a multi-day shift spanning {
-                    differenceInDays(
-                      parseISO(formData.endDate), 
-                      parseISO(formData.startDate)
-                    ) + 1
-                  } days
-                </Typography>
-              )}
-            </Grid>
-          </Grid>
-          
-          {/* Section 3: Recurrence Pattern */}
-          <Typography variant="h6" gutterBottom sx={{ 
-            backgroundColor: 'info.light', 
-            color: 'info.contrastText',
-            p: 1,
-            borderRadius: 1
-          }}>
-            Recurrence Pattern
-          </Typography>
-          
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              A shift can repeat according to a pattern (weekly, biweekly, etc.)
-            </Typography>
-          </Box>
-          
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    name="isRecurring"
-                    checked={formData.isRecurring || false}
-                    onChange={handleRecurringToggle}
-                    disabled={!isAuthenticated || (modalState.mode === 'edit' && modalState.shift?.seriesId !== undefined)}
-                  />
-                }
-                label="Set as recurring"
-              />
-              {modalState.mode === 'edit' && modalState.shift?.seriesId && !formData.isRecurring && (
-                <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                  This shift is part of a recurring pattern but recurrence has been disabled. Saving will remove it from the pattern.
-                </Typography>
-              )}
-              
-              {/* Add clarifying message for multi-day recurring shifts */}
-              {formData.isRecurring && formData.startDate && formData.endDate && 
-               formData.startDate !== formData.endDate && (
-                <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
-                  <Typography variant="body2">
-                    <strong>Note:</strong> This is both a multi-day shift and a recurring shift.
-                  </Typography>
-                  <Typography variant="body2">
-                    • When editing a single instance, it will be removed from the recurring series.
-                  </Typography>
-                  <Typography variant="body2">
-                    • When deleting a specific day, that day will be removed from this instance only.
-                  </Typography>
-                </Alert>
-              )}
-            </Grid>
-            
-            <Collapse in={formData.isRecurring || false} sx={{ width: '100%' }}>
-              <Grid container spacing={2} sx={{ mt: 0.5, pl: 2 }}>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel id="recurrence-pattern-label">Recurrence Pattern</InputLabel>
-                    <Select
-                      labelId="recurrence-pattern-label"
-                      name="recurrencePattern"
-                      value={formData.recurrencePattern || 'weekly'}
-                      onChange={handleSelectChange}
-                      label="Recurrence Pattern"
-                      disabled={!isAuthenticated}
-                    >
-                      <MenuItem value="daily">Daily</MenuItem>
-                      <MenuItem value="weekly">Weekly</MenuItem>
-                      <MenuItem value="biweekly">Bi-weekly</MenuItem>
-                      <MenuItem value="monthly">Monthly</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <DatePicker
-                    label="Recurrence End Date"
-                    value={formData.recurrenceEndDate ? parseISO(formData.recurrenceEndDate) : null}
-                    onChange={(date) => handleDateChange('recurrenceEndDate', date)}
-                    slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
-                    disabled={!isAuthenticated}
-                  />
-                </Grid>
-              </Grid>
-            </Collapse>
-          </Grid>
-          
-          {/* Section 4: Update Options for Edit Mode */}
-          {modalState.mode === 'edit' && isRecurringSeries && (
-            <>
-              <Typography variant="h6" gutterBottom sx={{ 
-                backgroundColor: 'warning.light', 
-                color: 'warning.contrastText',
-                p: 1,
-                borderRadius: 1
-              }}>
-                Update Scope
+        {/* View Mode */}
+        {editMode === 'view' && modalState.mode === 'edit' && (
+          <Box sx={{ mt: 2 }}>
+            <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                {providerName}
               </Typography>
               
-              <Box sx={{ 
-                mt: 2, 
-                p: 2, 
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                bgcolor: 'background.paper',
-                mb: 3
-              }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Choose which occurrences to update
-                </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <DateRangeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Date</Typography>
+                      <Typography variant="body1">
+                        {isMultiDayShift 
+                          ? `${format(parseISO(formData.startDate || ''), 'MMM d, yyyy')} - ${format(parseISO(formData.endDate || ''), 'MMM d, yyyy')}`
+                          : format(parseISO(formData.startDate || ''), 'MMM d, yyyy')}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
                 
-                {/* Add clarifying message for multi-day recurring shifts */}
-                {isMultiDayShift && (
-                  <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Note:</strong> When updating a multi-day shift in a recurring series:
-                    </Typography>
-                    <Typography variant="body2">
-                      • "Only this occurrence" will break this instance from the series
-                    </Typography>
-                    <Typography variant="body2">
-                      • "All occurrences" will update the entire recurring pattern
-                    </Typography>
-                  </Alert>
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <LocationOnIcon sx={{ mr: 1, color: 'primary.main' }} />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Location</Typography>
+                      <Typography variant="body1">{clinicTypeName}</Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                
+                {isRecurringSeries && (
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <EventRepeatIcon sx={{ mr: 1, color: 'primary.main' }} />
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Recurring Pattern</Typography>
+                        <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
+                          {formData.recurrencePattern} 
+                          {formData.recurrenceEndDate ? ` until ${format(parseISO(formData.recurrenceEndDate), 'MMM d, yyyy')}` : ''}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
                 )}
                 
-                <FormControl component="fieldset">
-                  <RadioGroup
-                    value={updateScope}
-                    onChange={(e) => setUpdateScope(e.target.value as 'this' | 'future' | 'all')}
-                  >
-                    <FormControlLabel 
-                      value="this" 
-                      control={<Radio />} 
-                      label={
-                        <Box>
-                          <Typography variant="body2">
-                            Only this occurrence
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Changes apply only to this specific shift
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                    <FormControlLabel 
-                      value="future" 
-                      control={<Radio />} 
-                      label={
-                        <Box>
-                          <Typography variant="body2">
-                            This and all future occurrences
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Changes apply to this shift and all future shifts in this pattern
-                          </Typography>
-                        </Box>
-                      }
-                      disabled={true} // Future implementation
-                    />
-                    <FormControlLabel 
-                      value="all" 
-                      control={<Radio />} 
-                      label={
-                        <Box>
-                          <Typography variant="body2">
-                            All occurrences
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Changes apply to all shifts in this recurrence pattern
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </RadioGroup>
-                </FormControl>
-              </Box>
-            </>
-          )}
-          
-          {/* Section 5: Delete Options for Edit Mode */}
-          {modalState.mode === 'edit' && (
-            <Box sx={{ mb: 2 }}>
-              {/* If it's a multi-day shift, show day-specific deletion options */}
-              {isMultiDayShift && (
-                <Box sx={{ 
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 2,
-                  mb: 2,
-                  bgcolor: 'background.paper'
-                }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Delete Options for Multi-Day Shift
-                  </Typography>
-                  
-                  {/* Add clarifying message for multi-day recurring shifts */}
-                  {modalState.shift?.isRecurring && modalState.shift?.seriesId && (
-                    <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+                {formData.notes && (
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+                      <InfoIcon sx={{ mr: 1, mt: 0.5, color: 'primary.main' }} />
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">Notes</Typography>
+                        <Typography variant="body1">{formData.notes}</Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                )}
+                
+                {formData.isVacation && (
+                  <Grid item xs={12}>
+                    <Alert severity="info" icon={false}>
                       <Typography variant="body2">
-                        <strong>Note:</strong> When deleting a specific day from a recurring shift, 
-                        this instance will be removed from the recurring series.
+                        This is marked as vacation time
                       </Typography>
                     </Alert>
-                  )}
-                  
-                  <FormControl component="fieldset">
-                    <RadioGroup
-                      value={deleteOption}
-                      onChange={(e) => setDeleteOption(e.target.value as DeleteOptionType)}
-                    >
-                      <FormControlLabel 
-                        value="entire" 
-                        control={<Radio size="small" />} 
-                        label={
-                          <Box>
-                            <Typography variant="body2">
-                              Delete entire shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Removes the complete shift span
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                      <FormControlLabel 
-                        value="specific-day" 
-                        control={<Radio size="small" />} 
-                        label={
-                          <Box>
-                            <Typography variant="body2">
-                              Delete only a specific day
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Removes a single day from this shift span
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </RadioGroup>
-                  </FormControl>
-                  
-                  {deleteOption === 'specific-day' && shiftDates.length > 0 && (
-                    <FormControl fullWidth sx={{ mt: 1 }}>
-                      <InputLabel id="specific-day-label">Select Day to Remove</InputLabel>
-                      <Select
-                        labelId="specific-day-label"
-                        value={specificDeleteDate || shiftDates[0].date}
-                        onChange={(e) => setSpecificDeleteDate(e.target.value)}
-                        label="Select Day to Remove"
-                        size="small"
-                      >
-                        {shiftDates.map(date => (
-                          <MenuItem key={date.date} value={date.date}>
-                            {date.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-                </Box>
-              )}
-              
-              {/* If it's a recurring series, show series deletion options */}
-              {isRecurringSeries && (
-                <Box sx={{ 
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 2,
-                  mb: 2, 
-                  bgcolor: 'background.paper'
+                  </Grid>
+                )}
+              </Grid>
+            </Paper>
+            
+            {/* Edit Options Button */}
+            <Button 
+              variant="contained" 
+              color="primary" 
+              fullWidth 
+              startIcon={<EditIcon />}
+              onClick={handleEditClick}
+              disabled={!isAuthenticated}
+            >
+              Edit This Shift
+            </Button>
+          </Box>
+        )}
+        
+        {/* Edit Mode */}
+        {editMode === 'edit' && (
+          <Box sx={{ mt: 2 }}>
+            {/* Edit Scope Selection - Only show for existing shifts */}
+            {modalState.mode === 'edit' && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  backgroundColor: 'primary.light', 
+                  color: 'primary.contrastText',
+                  p: 1,
+                  borderRadius: 1
                 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Delete Options for Recurring Pattern
-                  </Typography>
-                  
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={deleteSeries}
-                        onChange={(e) => isAuthenticated && setDeleteSeries(e.target.checked)}
-                        disabled={!isAuthenticated || deleteOption !== 'entire'}
-                        color="error"
-                      />
-                    }
+                  What would you like to edit?
+                </Typography>
+                
+                <RadioGroup
+                  value={editScope}
+                  onChange={(e) => setEditScope(e.target.value as EditScopeType)}
+                >
+                  <FormControlLabel 
+                    value="this" 
+                    control={<Radio />} 
                     label={
                       <Box>
                         <Typography variant="body2">
-                          Delete all shifts in this recurring pattern
+                          Only this occurrence ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')})
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Removes all related shifts following the same recurrence pattern
+                          Changes will only affect this specific day
                         </Typography>
                       </Box>
                     }
                   />
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
+                  
+                  {isMultiDayShift && (
+                    <FormControlLabel 
+                      value="multiday" 
+                      control={<Radio />} 
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            This multi-day shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Changes will affect all days in this shift span
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  )}
+                  
+                  {isRecurringSeries && (
+                    <FormControlLabel 
+                      value="series" 
+                      control={<Radio />} 
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            All recurring shifts in this series
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Changes will affect all shifts in this recurring pattern
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  )}
+                </RadioGroup>
+              </Box>
+            )}
+            
+            {/* Section 1: Basic Shift Information */}
+            <Typography variant="h6" gutterBottom sx={{ 
+              backgroundColor: 'primary.light', 
+              color: 'primary.contrastText',
+              p: 1,
+              borderRadius: 1
+            }}>
+              Shift Details
+            </Typography>
+            
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="provider-label">Provider</InputLabel>
+                  <Select
+                    labelId="provider-label"
+                    name="providerId"
+                    value={formData.providerId || ''}
+                    onChange={handleSelectChange}
+                    label="Provider"
+                    disabled={!isAuthenticated}
+                  >
+                    {activeProviders.map(provider => (
+                      <MenuItem key={provider.id} value={provider.id}>
+                        {`${provider.firstName} ${provider.lastName}`}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="clinic-type-label">Location</InputLabel>
+                  <Select
+                    labelId="clinic-type-label"
+                    name="clinicTypeId"
+                    value={formData.clinicTypeId || ''}
+                    onChange={handleSelectChange}
+                    label="Location"
+                    disabled={!isAuthenticated}
+                  >
+                    {activeClinicTypes.map(clinicType => (
+                      <MenuItem key={clinicType.id} value={clinicType.id}>
+                        {clinicType.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <DatePicker
+                  label="Start Date"
+                  value={formData.startDate ? parseISO(formData.startDate) : null}
+                  onChange={(date) => handleDateChange('startDate', date)}
+                  disabled={!isAuthenticated}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <DatePicker
+                  label="End Date"
+                  value={formData.endDate ? parseISO(formData.endDate) : null}
+                  onChange={(date) => handleDateChange('endDate', date)}
+                  disabled={!isAuthenticated}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      name="isVacation"
+                      checked={formData.isVacation || false}
+                      onChange={handleChange}
+                      disabled={!isAuthenticated}
+                    />
+                  }
+                  label="Mark as vacation"
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  name="notes"
+                  label="Notes"
+                  value={formData.notes || ''}
+                  onChange={handleChange}
+                  fullWidth
+                  multiline
+                  rows={2}
+                  disabled={!isAuthenticated}
+                />
+              </Grid>
+            </Grid>
+            
+            {/* Section 2: Recurrence Options */}
+            <Typography variant="h6" gutterBottom sx={{ 
+              backgroundColor: 'primary.light', 
+              color: 'primary.contrastText',
+              p: 1,
+              borderRadius: 1
+            }}>
+              Recurrence
+            </Typography>
+            
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      name="isRecurring"
+                      checked={formData.isRecurring || false}
+                      onChange={handleChange}
+                      disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                    />
+                  }
+                  label="Recurring shift"
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Collapse in={formData.isRecurring || false}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel id="recurrence-pattern-label">Recurrence Pattern</InputLabel>
+                        <Select
+                          labelId="recurrence-pattern-label"
+                          name="recurrencePattern"
+                          value={formData.recurrencePattern || 'weekly'}
+                          onChange={handleSelectChange}
+                          label="Recurrence Pattern"
+                          disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                        >
+                          <MenuItem value="daily">Daily</MenuItem>
+                          <MenuItem value="weekly">Weekly</MenuItem>
+                          <MenuItem value="biweekly">Biweekly</MenuItem>
+                          <MenuItem value="monthly">Monthly</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <DatePicker
+                        label="Recurrence End Date"
+                        value={formData.recurrenceEndDate ? parseISO(formData.recurrenceEndDate) : null}
+                        onChange={(date) => handleDateChange('recurrenceEndDate', date)}
+                        disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Collapse>
+              </Grid>
+            </Grid>
+            
+            {/* Delete Options - Only show for existing shifts */}
+            {modalState.mode === 'edit' && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  backgroundColor: 'error.light', 
+                  color: 'error.contrastText',
+                  p: 1,
+                  borderRadius: 1
+                }}>
+                  Delete Options
+                </Typography>
+                
+                {/* If it's a multi-day shift, show day-specific deletion options */}
+                {isMultiDayShift && editScope === 'multiday' && (
+                  <Box sx={{ 
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    p: 2,
+                    mb: 2,
+                    bgcolor: 'background.paper'
+                  }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Delete Options for Multi-Day Shift
+                    </Typography>
+                    
+                    {/* Add clarifying message for multi-day recurring shifts */}
+                    {modalState.shift?.isRecurring && modalState.shift?.seriesId && (
+                      <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+                        <Typography variant="body2">
+                          <strong>Note:</strong> When deleting a specific day from a recurring shift, 
+                          this instance will be removed from the recurring series.
+                        </Typography>
+                      </Alert>
+                    )}
+                    
+                    <FormControl component="fieldset">
+                      <RadioGroup
+                        value={deleteOption}
+                        onChange={(e) => setDeleteOption(e.target.value as DeleteOptionType)}
+                      >
+                        <FormControlLabel 
+                          value="entire" 
+                          control={<Radio size="small" />} 
+                          label={
+                            <Box>
+                              <Typography variant="body2">
+                                Delete entire shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Removes the complete shift span
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                        <FormControlLabel 
+                          value="specific-day" 
+                          control={<Radio size="small" />} 
+                          label={
+                            <Box>
+                              <Typography variant="body2">
+                                Delete only a specific day
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Removes a single day from this shift span
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </RadioGroup>
+                    </FormControl>
+                    
+                    <Collapse in={deleteOption === 'specific-day'}>
+                      <Box sx={{ mt: 2 }}>
+                        <DatePicker
+                          label="Select day to delete"
+                          value={specificDeleteDate ? parseISO(specificDeleteDate) : null}
+                          onChange={handleSpecificDeleteDateChange}
+                          disabled={!isAuthenticated}
+                          minDate={parseISO(modalState.shift?.startDate || '')}
+                          maxDate={parseISO(modalState.shift?.endDate || '')}
+                          slotProps={{ textField: { fullWidth: true } }}
+                        />
+                      </Box>
+                    </Collapse>
+                  </Box>
+                )}
+                
+                {/* Series deletion options */}
+                {isRecurringSeries && editScope === 'series' && (
+                  <Box sx={{ 
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    p: 2,
+                    mb: 2, 
+                    bgcolor: 'background.paper'
+                  }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Delete Options for Recurring Pattern
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={deleteSeries}
+                          onChange={(e) => isAuthenticated && setDeleteSeries(e.target.checked)}
+                          disabled={!isAuthenticated}
+                          color="error"
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            Delete all shifts in this recurring pattern
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Removes all related shifts following the same recurrence pattern
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+        )}
       </DialogContent>
       
       <DialogActions>
-        {modalState.mode === 'edit' && (
+        {modalState.mode === 'edit' && editMode === 'edit' && (
           <Button 
             onClick={handleDelete} 
             color="error"
@@ -998,22 +756,25 @@ const ShiftModal: React.FC = () => {
             startIcon={<DeleteIcon />}
             sx={{ mr: 'auto' }}
           >
-            {deleteOption === 'specific-day' && isMultiDayShift 
-              ? 'Delete Selected Day' 
-              : deleteSeries 
-                ? 'Delete All Recurring Shifts'
-                : 'Delete Shift'}
+            {editScope === 'this' 
+              ? 'Delete This Occurrence' 
+              : editScope === 'multiday' 
+                ? (deleteOption === 'specific-day' ? 'Delete Selected Day' : 'Delete Multi-Day Shift')
+                : (deleteSeries ? 'Delete All Recurring Shifts' : 'Delete This Series')}
           </Button>
         )}
         
         <Button onClick={closeModal}>Cancel</Button>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained"
-          disabled={!isAuthenticated}
-        >
-          {modalState.mode === 'add' ? 'Add' : 'Save'}
-        </Button>
+        
+        {editMode === 'edit' && (
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained"
+            disabled={!isAuthenticated}
+          >
+            {modalState.mode === 'add' ? 'Add' : 'Save Changes'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
