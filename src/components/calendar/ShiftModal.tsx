@@ -14,7 +14,6 @@ import {
   Switch,
   Box,
   Typography,
-  Divider,
   SelectChangeEvent,
   Grid,
   Collapse,
@@ -68,7 +67,6 @@ const ShiftModal: React.FC = () => {
     recurrenceEndDate: ''
   });
   
-  const [updateSeries, setUpdateSeries] = useState(false);
   const [deleteSeries, setDeleteSeries] = useState(false);
   const [deleteOption, setDeleteOption] = useState<DeleteOptionType>('entire');
   const [specificDeleteDate, setSpecificDeleteDate] = useState<string | null>(null);
@@ -92,6 +90,9 @@ const ShiftModal: React.FC = () => {
         recurrencePattern: 'weekly' as RecurrencePattern,
         recurrenceEndDate: ''
       });
+      // Reset other state
+      setUpdateScope('this');
+      setDeleteSeries(false);
       // Reset the initialization flag when modal closes
       formInitialized.current = false;
       return;
@@ -118,7 +119,7 @@ const ShiftModal: React.FC = () => {
         
         console.log('Setting form data for add mode:', newFormData);
         setFormData(newFormData);
-        setUpdateSeries(false);
+        setUpdateScope('this');
         setDeleteSeries(false);
         formInitialized.current = true;
       } else if (modalState.mode === 'edit' && modalState.shift) {
@@ -133,7 +134,7 @@ const ShiftModal: React.FC = () => {
         
         console.log('Setting form data for edit mode:', shift);
         setFormData(shift);
-        setUpdateSeries(false);
+        setUpdateScope('this');
         setDeleteSeries(false);
         formInitialized.current = true;
       }
