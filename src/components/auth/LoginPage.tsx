@@ -163,14 +163,7 @@ const LoginPage: React.FC = () => {
           </Box>
         </form>
         
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            For admin access: Username: Admin or admin@clinicamedicos.org, Password: FamMed25!
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            For read-only access: Click the Read-Only Access button
-          </Typography>
-        </Box>
+        {/* Login instructions removed for security */}
       </Paper>
     </Box>
   );
