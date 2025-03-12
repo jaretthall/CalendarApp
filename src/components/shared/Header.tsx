@@ -21,8 +21,6 @@ import {
   CalendarViewMonth,
   ViewWeek,
   Today,
-  ArrowBack,
-  ArrowForward,
   CloudDownload,
   CloudUpload,
   PictureAsPdf,
