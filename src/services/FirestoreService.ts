@@ -321,8 +321,8 @@ class FirestoreService {
           seriesId: data.seriesId,
           notes: data.notes,
           location: data.location,
-          createdAt: (data.createdAt as Timestamp).toDate(),
-          updatedAt: (data.updatedAt as Timestamp).toDate()
+          createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+          updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toDate() : new Date()
         };
       });
     } catch (error) {
@@ -354,8 +354,8 @@ class FirestoreService {
           seriesId: data.seriesId,
           notes: data.notes,
           location: data.location,
-          createdAt: (data.createdAt as Timestamp).toDate(),
-          updatedAt: (data.updatedAt as Timestamp).toDate()
+          createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+          updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toDate() : new Date()
         };
       });
     } catch (error) {
@@ -387,8 +387,8 @@ class FirestoreService {
           seriesId: data.seriesId,
           notes: data.notes,
           location: data.location,
-          createdAt: (data.createdAt as Timestamp).toDate(),
-          updatedAt: (data.updatedAt as Timestamp).toDate()
+          createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+          updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toDate() : new Date()
         };
       });
     } catch (error) {
@@ -399,11 +399,40 @@ class FirestoreService {
 
   async addShift(shift: Omit<Shift, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> {
     try {
-      const docRef = await addDoc(collection(firestore, SHIFTS_COLLECTION), {
-        ...shift,
+      // Create a clean object without undefined values
+      const shiftData: any = {
+        providerId: shift.providerId,
+        clinicTypeId: shift.clinicTypeId || '',
+        startDate: shift.startDate,
+        endDate: shift.endDate,
+        isVacation: shift.isVacation,
+        isRecurring: shift.isRecurring,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      // Only add properties that are defined
+      if (shift.recurrencePattern) {
+        shiftData.recurrencePattern = shift.recurrencePattern;
+      }
+      
+      if (shift.recurrenceEndDate) {
+        shiftData.recurrenceEndDate = shift.recurrenceEndDate;
+      }
+      
+      if (shift.seriesId) {
+        shiftData.seriesId = shift.seriesId;
+      }
+      
+      if (shift.notes) {
+        shiftData.notes = shift.notes;
+      }
+      
+      if (shift.location) {
+        shiftData.location = shift.location;
+      }
+      
+      const docRef = await addDoc(collection(firestore, SHIFTS_COLLECTION), shiftData);
       
       return docRef.id;
     } catch (error) {
@@ -415,10 +444,58 @@ class FirestoreService {
   async updateShift(id: string, shift: Partial<Shift>): Promise<boolean> {
     try {
       const docRef = doc(firestore, SHIFTS_COLLECTION, id);
-      await updateDoc(docRef, {
-        ...shift,
+      
+      // Create a clean object without undefined values
+      const updateData: any = {
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      // Only add properties that are defined and not undefined
+      if (shift.providerId !== undefined) {
+        updateData.providerId = shift.providerId;
+      }
+      
+      if (shift.clinicTypeId !== undefined) {
+        updateData.clinicTypeId = shift.clinicTypeId || '';
+      }
+      
+      if (shift.startDate !== undefined) {
+        updateData.startDate = shift.startDate;
+      }
+      
+      if (shift.endDate !== undefined) {
+        updateData.endDate = shift.endDate;
+      }
+      
+      if (shift.isVacation !== undefined) {
+        updateData.isVacation = shift.isVacation;
+      }
+      
+      if (shift.isRecurring !== undefined) {
+        updateData.isRecurring = shift.isRecurring;
+      }
+      
+      if (shift.recurrencePattern !== undefined) {
+        updateData.recurrencePattern = shift.recurrencePattern;
+      }
+      
+      if (shift.recurrenceEndDate !== undefined) {
+        updateData.recurrenceEndDate = shift.recurrenceEndDate;
+      }
+      
+      if (shift.seriesId !== undefined) {
+        updateData.seriesId = shift.seriesId;
+      }
+      
+      if (shift.notes !== undefined) {
+        updateData.notes = shift.notes;
+      }
+      
+      if (shift.location !== undefined) {
+        updateData.location = shift.location;
+      }
+      
+      await updateDoc(docRef, updateData);
       
       return true;
     } catch (error) {
@@ -477,8 +554,8 @@ class FirestoreService {
           seriesId: data.seriesId,
           notes: data.notes,
           location: data.location,
-          createdAt: (data.createdAt as Timestamp).toDate(),
-          updatedAt: (data.updatedAt as Timestamp).toDate()
+          createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+          updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toDate() : new Date()
         };
       });
     } catch (error) {

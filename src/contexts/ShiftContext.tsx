@@ -264,11 +264,20 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateShift = async (id: string, updatedShift: Partial<Shift>, updateSeries = false) => {
     console.log('Updating shift:', id, updatedShift, 'Update series:', updateSeries);
     
-    const shiftToUpdate = shifts.find(s => s.id === id);
+    let shiftToUpdate = shifts.find(s => s.id === id);
     
     if (!shiftToUpdate) {
-      console.error('Shift not found:', id);
-      return;
+      console.log('Shift not found in local state, attempting to refresh shifts first');
+      // Try to refresh shifts first to ensure we have the latest data
+      await forceRefreshShifts();
+      
+      // Try to find the shift again after refresh
+      shiftToUpdate = shifts.find(s => s.id === id);
+      
+      if (!shiftToUpdate) {
+        console.error('Shift not found even after refresh:', id);
+        return;
+      }
     }
     
     try {
@@ -490,31 +499,40 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteShift = async (id: string, deleteSeries = false) => {
     console.log('Deleting shift:', id, 'Delete series:', deleteSeries);
     
-    const shiftToDelete = shifts.find(s => s.id === id);
+    let shiftToDelete = shifts.find(s => s.id === id);
     
     if (!shiftToDelete) {
-      console.error('Shift not found:', id);
+      console.log('Shift not found in local state, attempting to refresh shifts first');
+      // Try to refresh shifts first to ensure we have the latest data
+      await forceRefreshShifts();
       
-      // Even if the specific shift is not found, we can still try to delete the series
-      // by its ID if we're in delete series mode and have the ID in the modal state
-      if (deleteSeries && modalState.shift?.seriesId) {
-        console.log('Attempting to delete series by seriesId:', modalState.shift.seriesId);
+      // Try to find the shift again after refresh
+      shiftToDelete = shifts.find(s => s.id === id);
+      
+      if (!shiftToDelete) {
+        console.error('Shift not found even after refresh:', id);
         
-        try {
-          // Delete all shifts in the series from the database first
-          const shiftsToDelete = shifts.filter(s => s.seriesId === modalState.shift?.seriesId);
-          for (const shift of shiftsToDelete) {
-            await databaseService.deleteShift(shift.id);
-          }
+        // Even if the specific shift is not found, we can still try to delete the series
+        // by its ID if we're in delete series mode and have the ID in the modal state
+        if (deleteSeries && modalState.shift?.seriesId) {
+          console.log('Attempting to delete series by seriesId:', modalState.shift.seriesId);
           
-          // Then update local state
-          setShifts(shifts.filter(shift => shift.seriesId !== modalState.shift?.seriesId));
-        } catch (error) {
-          console.error('Error deleting shift series:', error);
+          try {
+            // Delete all shifts in the series from the database first
+            const shiftsToDelete = shifts.filter(s => s.seriesId === modalState.shift?.seriesId);
+            for (const shift of shiftsToDelete) {
+              await databaseService.deleteShift(shift.id);
+            }
+            
+            // Then update local state
+            setShifts(shifts.filter(shift => shift.seriesId !== modalState.shift?.seriesId));
+          } catch (error) {
+            console.error('Error deleting shift series:', error);
+          }
         }
+        
+        return;
       }
-      
-      return;
     }
     
     try {

@@ -281,6 +281,7 @@ const ShiftModal: React.FC = () => {
       // Clear recurrence fields if not recurring
       delete shiftToSubmit.recurrencePattern;
       delete shiftToSubmit.recurrenceEndDate;
+      delete shiftToSubmit.seriesId;
     }
 
     try {
@@ -295,8 +296,13 @@ const ShiftModal: React.FC = () => {
       }
       
       // Force a refresh after adding or updating to ensure consistency
-      setTimeout(() => {
-        forceRefreshShifts();
+      setTimeout(async () => {
+        try {
+          await forceRefreshShifts();
+          console.log('Shifts refreshed successfully after submit');
+        } catch (error) {
+          console.error('Error refreshing shifts after submit:', error);
+        }
       }, 500);
     } catch (error) {
       console.error('Error saving shift:', error);
@@ -382,7 +388,10 @@ const ShiftModal: React.FC = () => {
           const updatedShift = { 
             ...shift, 
             startDate: newStartDate,
-            seriesId: undefined 
+            seriesId: undefined,
+            isRecurring: false,
+            recurrencePattern: undefined,
+            recurrenceEndDate: undefined
           };
           // Update the shift with the new data
           updateShift(shift.id, updatedShift, false);
@@ -404,7 +413,10 @@ const ShiftModal: React.FC = () => {
           const updatedShift = { 
             ...shift, 
             endDate: newEndDate,
-            seriesId: undefined 
+            seriesId: undefined,
+            isRecurring: false,
+            recurrencePattern: undefined,
+            recurrenceEndDate: undefined
           };
           // Update the shift with the new data
           updateShift(shift.id, updatedShift, false);
@@ -426,7 +438,10 @@ const ShiftModal: React.FC = () => {
           const updatedShift = { 
             ...shift, 
             endDate: newEndDate,
-            seriesId: undefined 
+            seriesId: undefined,
+            isRecurring: false,
+            recurrencePattern: undefined,
+            recurrenceEndDate: undefined
           };
           // Update the shift with the new data
           updateShift(shift.id, updatedShift, false);
@@ -446,10 +461,10 @@ const ShiftModal: React.FC = () => {
           isVacation: shift.isVacation,
           notes: shift.notes,
           // For the new shift, don't include it in the recurring series
-          isRecurring: isPartOfSeries ? false : shift.isRecurring,
-          recurrencePattern: isPartOfSeries ? undefined : shift.recurrencePattern,
-          recurrenceEndDate: isPartOfSeries ? undefined : shift.recurrenceEndDate,
-          seriesId: isPartOfSeries ? undefined : shift.seriesId
+          isRecurring: false,
+          recurrencePattern: undefined,
+          recurrenceEndDate: undefined,
+          seriesId: undefined
         };
         
         console.log(`Creating new shift from: ${newStartDate} to ${shift.endDate}`);
@@ -457,8 +472,13 @@ const ShiftModal: React.FC = () => {
       }
       
       // Force a refresh after specific day deletion to ensure consistency
-      setTimeout(() => {
-        forceRefreshShifts();
+      setTimeout(async () => {
+        try {
+          await forceRefreshShifts();
+          console.log('Shifts refreshed successfully after specific day deletion');
+        } catch (error) {
+          console.error('Error refreshing shifts after specific day deletion:', error);
+        }
       }, 500);
     } catch (error) {
       console.error('Error deleting specific day:', error);
