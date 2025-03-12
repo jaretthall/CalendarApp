@@ -77,16 +77,40 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadShifts = useCallback(async () => {
     setLoading(true);
     try {
-      // Get current date and date 3 months from now for initial load
+      // Get current date and date 12 months from now for initial load (increased from 3 months)
       const today = new Date();
-      const threeMonthsLater = addMonths(today, 3);
+      const oneYearLater = addMonths(today, 12);
       const startDate = format(today, 'yyyy-MM-dd');
-      const endDate = format(threeMonthsLater, 'yyyy-MM-dd');
+      const endDate = format(oneYearLater, 'yyyy-MM-dd');
       
+      // Get shifts in the date range
       const shiftsData = await databaseService.getShiftsByDateRange(startDate, endDate);
       
+      // Extract series IDs to load complete series
+      const seriesIds = new Set<string>();
+      shiftsData.forEach((shift: DatabaseShift) => {
+        if (shift.seriesId) {
+          seriesIds.add(shift.seriesId);
+        }
+      });
+      
+      // Additional collection for shifts outside the date range that are part of a series
+      let additionalSeriesShifts: DatabaseShift[] = [];
+      
+      // For each series ID, ensure we have all shifts in that series
+      for (const seriesId of seriesIds) {
+        const seriesShifts = await databaseService.getShiftsBySeries(seriesId);
+        // Only add shifts that aren't already in the date range result
+        const shiftIdsInDateRange = new Set(shiftsData.map((s: DatabaseShift) => s.id));
+        const newSeriesShifts = seriesShifts.filter((s: DatabaseShift) => !shiftIdsInDateRange.has(s.id));
+        additionalSeriesShifts = [...additionalSeriesShifts, ...newSeriesShifts];
+      }
+      
+      // Combine all shifts
+      const combinedShifts = [...shiftsData, ...additionalSeriesShifts];
+      
       // Convert database shifts to the expected format
-      const formattedShifts: Shift[] = shiftsData.map((shift: DatabaseShift) => {
+      const formattedShifts: Shift[] = combinedShifts.map((shift: DatabaseShift) => {
         // Validate recurrencePattern
         let validRecurrencePattern: 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined = undefined;
         if (shift.recurrencePattern) {
@@ -155,7 +179,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const recurrenceEndDate = parseISO(shift.recurrenceEndDate);
         
         let iterationCount = 0;
-        const MAX_ITERATIONS = 100;
+        const MAX_ITERATIONS = 300; // Increased from 100 to 300 for longer recurrences
         
         while (iterationCount < MAX_ITERATIONS) {
           let nextDate: Date;
@@ -336,7 +360,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             
             // Prevent infinite loops by limiting the number of iterations
             let iterationCount = 0;
-            const MAX_ITERATIONS = 100; // Reasonable limit for most use cases
+            const MAX_ITERATIONS = 300; // Increased from 100 to 300 for longer recurrences
             
             while (iterationCount < MAX_ITERATIONS) {
               let nextDate: Date;

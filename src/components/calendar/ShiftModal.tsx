@@ -98,6 +98,14 @@ const ShiftModal: React.FC = () => {
       return;
     }
     
+    // Force refresh shifts data to ensure we have the complete series
+    if (modalState.isOpen && modalState.mode === 'edit' && modalState.shift?.seriesId) {
+      console.log('Forcing refresh to ensure complete series data is loaded');
+      forceRefreshShifts().then(() => {
+        console.log('Shifts refreshed for series data');
+      });
+    }
+    
     if (modalState.isOpen && !formInitialized.current) {
       if (modalState.mode === 'add' && modalState.date) {
         // Set default end date to same as start date

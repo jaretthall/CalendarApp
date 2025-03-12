@@ -364,6 +364,39 @@ class FirestoreService {
     }
   }
 
+  async getShiftsBySeries(seriesId: string): Promise<Shift[]> {
+    try {
+      const shiftsQuery = query(
+        collection(firestore, SHIFTS_COLLECTION),
+        where('seriesId', '==', seriesId)
+      );
+      
+      const snapshot = await getDocs(shiftsQuery);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          providerId: data.providerId,
+          clinicTypeId: data.clinicTypeId,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          isVacation: data.isVacation,
+          isRecurring: data.isRecurring,
+          recurrencePattern: data.recurrencePattern,
+          recurrenceEndDate: data.recurrenceEndDate,
+          seriesId: data.seriesId,
+          notes: data.notes,
+          location: data.location,
+          createdAt: (data.createdAt as Timestamp).toDate(),
+          updatedAt: (data.updatedAt as Timestamp).toDate()
+        };
+      });
+    } catch (error) {
+      console.error(`Error getting shifts for series ${seriesId}:`, error);
+      return [];
+    }
+  }
+
   async addShift(shift: Omit<Shift, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> {
     try {
       const docRef = await addDoc(collection(firestore, SHIFTS_COLLECTION), {
