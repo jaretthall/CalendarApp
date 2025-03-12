@@ -98,7 +98,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let additionalSeriesShifts: DatabaseShift[] = [];
       
       // For each series ID, ensure we have all shifts in that series
-      for (const seriesId of seriesIds) {
+      for (const seriesId of Array.from(seriesIds)) {
         const seriesShifts = await databaseService.getShiftsBySeries(seriesId);
         // Only add shifts that aren't already in the date range result
         const shiftIdsInDateRange = new Set(shiftsData.map((s: DatabaseShift) => s.id));
