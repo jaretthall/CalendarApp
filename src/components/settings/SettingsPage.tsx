@@ -10,6 +10,7 @@ import {
 import SyncSettings from './SyncSettings';
 import ProvidersSettings from './ProvidersSettings';
 import ClinicsSettings from './ClinicsSettings';
+import AccountSettings from './AccountSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { People, LocationOn, Sync, Settings as SettingsIcon } from '@mui/icons-material';
 
@@ -95,16 +96,7 @@ const SettingsPage: React.FC = () => {
           </TabPanel>
           
           <TabPanel value={tabValue} index={4}>
-            <Typography variant="h6">Account Settings</Typography>
-            {isAuthenticated ? (
-              <Typography variant="body1" sx={{ mt: 2 }}>
-                Account settings will be implemented in a future update.
-              </Typography>
-            ) : (
-              <Typography variant="body1" sx={{ mt: 2 }}>
-                Please log in to access account settings.
-              </Typography>
-            )}
+            <AccountSettings />
           </TabPanel>
         </Paper>
       </Box>

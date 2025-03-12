@@ -456,6 +456,37 @@ class FirestoreService {
     }
   }
 
+  // Get all shifts from the database
+  async getAllShifts(): Promise<Shift[]> {
+    try {
+      const shiftsQuery = query(collection(firestore, SHIFTS_COLLECTION));
+      const snapshot = await getDocs(shiftsQuery);
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          providerId: data.providerId,
+          clinicTypeId: data.clinicTypeId,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          isVacation: data.isVacation,
+          isRecurring: data.isRecurring,
+          recurrencePattern: data.recurrencePattern,
+          recurrenceEndDate: data.recurrenceEndDate,
+          seriesId: data.seriesId,
+          notes: data.notes,
+          location: data.location,
+          createdAt: (data.createdAt as Timestamp).toDate(),
+          updatedAt: (data.updatedAt as Timestamp).toDate()
+        };
+      });
+    } catch (error) {
+      console.error('Error getting all shifts:', error);
+      return [];
+    }
+  }
+
   // Sync Logs
   async logSync(syncType: string, status: string, details: { 
     fileName?: string, 
