@@ -10,15 +10,14 @@ import {
   DialogActions,
   TextField,
   Alert,
-  Paper,
-  Divider
+  Paper
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useShifts } from '../../contexts/ShiftContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AccountSettings: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const { shifts, forceRefreshShifts } = useShifts();
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -83,10 +82,10 @@ const AccountSettings: React.FC = () => {
         </Alert>
       ) : (
         <>
-          {user && (
+          {currentUser && (
             <Paper sx={{ p: 2, mb: 3 }}>
               <Typography variant="subtitle1">
-                Logged in as: {user.email}
+                Logged in as: {currentUser.email}
               </Typography>
             </Paper>
           )}
