@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -20,14 +20,10 @@ import {
   Alert,
   RadioGroup,
   Radio,
-  Divider,
-  Paper,
-  Stepper,
-  Step,
-  StepLabel
+  Paper
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { format, parseISO, addMonths, addDays, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useShifts, Shift } from '../../contexts/ShiftContext';
 import { useProviders } from '../../contexts/EmployeeContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
@@ -91,7 +87,6 @@ const ShiftModal: React.FC = () => {
   // State for edit mode and scope
   const [editMode, setEditMode] = useState<EditModeType>('view');
   const [editScope, setEditScope] = useState<EditScopeType>('this');
-  const [updateScope, setUpdateScope] = useState<'this' | 'future' | 'all'>('this');
   
   // Effect to initialize form data when the modal opens
   useEffect(() => {
@@ -141,7 +136,6 @@ const ShiftModal: React.FC = () => {
       setSpecificDeleteDate(null);
       setEditMode('view');
       setEditScope('this');
-      setUpdateScope('this');
     }
   }, [modalState.isOpen]);
 
