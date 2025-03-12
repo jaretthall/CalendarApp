@@ -1,0 +1,7 @@
+[33mcommit 4a8859700050d46fb522c59cceeecda2cf2dca80[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Jarett Hall <jarett@clinicamedicos.org>
+Date:   Tue Mar 11 17:49:52 2025 -0400
+
+    Temporarily bypass admin check in ProtectedRoute for debugging
+
+src/components/auth/ProtectedRoute.tsx

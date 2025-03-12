@@ -163,7 +163,11 @@ const LoginPage: React.FC = () => {
           </Box>
         </form>
         
-        {/* Login instructions removed for security */}
+        <Box sx={{ mt: 3, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            Contact your administrator for login credentials
+          </Typography>
+        </Box>
       </Paper>
     </Box>
   );
