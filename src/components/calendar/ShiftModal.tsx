@@ -37,7 +37,14 @@ type RecurrencePattern = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 type DeleteOptionType = 'entire' | 'specific-day';
 
 const ShiftModal: React.FC = () => {
-  const { modalState, closeModal, addShift, updateShift, deleteShift } = useShifts();
+  const { 
+    modalState, 
+    closeModal, 
+    addShift, 
+    updateShift, 
+    deleteShift, 
+    forceRefreshShifts 
+  } = useShifts();
   const { getActiveProviders } = useProviders();
   const { getActiveClinicTypes } = useClinicTypes();
   const { isAuthenticated } = useAuth();
@@ -274,12 +281,17 @@ const ShiftModal: React.FC = () => {
       } else {
         console.error('Cannot update shift: No shift data in modal state');
       }
+      
+      // Force a refresh after adding or updating to ensure consistency
+      setTimeout(() => {
+        forceRefreshShifts();
+      }, 500);
     } catch (error) {
       console.error('Error saving shift:', error);
     }
 
     closeModal();
-  }, [formData, modalState, isAuthenticated, updateSeries, addShift, updateShift, closeModal]);
+  }, [formData, modalState, isAuthenticated, updateSeries, addShift, updateShift, closeModal, forceRefreshShifts]);
 
   // Check if the current shift spans multiple days
   const isMultiDayShift = useMemo(() => {
@@ -382,12 +394,17 @@ const ShiftModal: React.FC = () => {
         console.log(`Creating new shift from: ${newStartDate} to ${shift.endDate}`);
         addShift(newShift);
       }
+      
+      // Force a refresh after specific day deletion to ensure consistency
+      setTimeout(() => {
+        forceRefreshShifts();
+      }, 500);
     } catch (error) {
       console.error('Error deleting specific day:', error);
     }
     
     closeModal();
-  }, [isAuthenticated, modalState.shift, specificDeleteDate, deleteShift, deleteSeries, updateShift, addShift, closeModal]);
+  }, [isAuthenticated, modalState.shift, specificDeleteDate, deleteShift, deleteSeries, updateShift, addShift, closeModal, forceRefreshShifts]);
 
   const handleDelete = useCallback(() => {
     if (!isAuthenticated) {
@@ -405,6 +422,12 @@ const ShiftModal: React.FC = () => {
         } else {
           // Regular delete for the entire shift
           deleteShift(modalState.shift.id, deleteSeries);
+          
+          // Force a refresh after deleting to ensure consistency
+          setTimeout(() => {
+            forceRefreshShifts();
+          }, 500);
+          
           closeModal();
         }
       } else {
@@ -413,7 +436,7 @@ const ShiftModal: React.FC = () => {
         closeModal();
       }
     }
-  }, [isAuthenticated, modalState, deleteSeries, deleteOption, specificDeleteDate, deleteShift, handleSpecificDayDelete, closeModal]);
+  }, [isAuthenticated, modalState, deleteSeries, deleteOption, specificDeleteDate, deleteShift, handleSpecificDayDelete, closeModal, forceRefreshShifts]);
 
   // Debug render
   console.log('Rendering ShiftModal with formData:', formData);

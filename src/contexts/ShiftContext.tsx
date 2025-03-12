@@ -58,6 +58,7 @@ interface ShiftContextType {
   exportShifts: () => string;
   importShifts: (shiftsData: string) => void;
   refreshShifts: () => Promise<void>;
+  forceRefreshShifts: () => Promise<void>;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
@@ -123,15 +124,26 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const seriesId = uuidv4();
         
         // Add the first shift with the series ID
-        const firstShiftId = await databaseService.addShift({
+        const firstShiftWithSeries = {
           ...shift,
           seriesId
-        });
+        };
+        
+        const firstShiftId = await databaseService.addShift(firstShiftWithSeries);
         
         if (!firstShiftId) {
           console.error('Failed to add first shift in series');
           return;
         }
+        
+        // Add the first shift to our local state
+        const firstShift: Shift = {
+          ...firstShiftWithSeries,
+          id: firstShiftId
+        };
+        
+        // Start building our new shifts array with existing shifts and our new first shift
+        const updatedShifts = [...shifts, firstShift];
         
         // Calculate the duration of the shift in days
         const startDate = parseISO(shift.startDate);
@@ -142,7 +154,10 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         let currentDate = startDate;
         const recurrenceEndDate = parseISO(shift.recurrenceEndDate);
         
-        while (true) {
+        let iterationCount = 0;
+        const MAX_ITERATIONS = 100;
+        
+        while (iterationCount < MAX_ITERATIONS) {
           let nextDate: Date;
           
           // Calculate the next occurrence based on the pattern
@@ -174,29 +189,55 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const nextShiftStartDate = format(nextDate, 'yyyy-MM-dd');
           const nextShiftEndDate = format(addDays(nextDate, shiftDuration), 'yyyy-MM-dd');
           
-          await databaseService.addShift({
+          const recurrenceShift = {
             ...shift,
             seriesId,
             startDate: nextShiftStartDate,
             endDate: nextShiftEndDate
-          });
+          };
+          
+          const newShiftId = await databaseService.addShift(recurrenceShift);
+          
+          if (newShiftId) {
+            // Add to our local state
+            updatedShifts.push({
+              ...recurrenceShift,
+              id: newShiftId
+            });
+          }
           
           // Move to the next date
           currentDate = nextDate;
+          iterationCount++;
         }
+        
+        if (iterationCount >= MAX_ITERATIONS) {
+          console.warn('Reached maximum number of iterations when generating recurring shifts');
+        }
+        
+        // Update our state with all the new shifts
+        setShifts(updatedShifts);
       } else {
-        // Add a single shift
-        await databaseService.addShift(shift);
+        // Add a single shift to the database
+        const newShiftId = await databaseService.addShift(shift);
+        
+        // Add to our local state if we got an ID back
+        if (newShiftId) {
+          setShifts([
+            ...shifts,
+            {
+              ...shift,
+              id: newShiftId
+            }
+          ]);
+        }
       }
-      
-      // Refresh shifts after adding
-      await loadShifts();
     } catch (error) {
       console.error('Error adding shift:', error);
     }
   };
 
-  const updateShift = (id: string, updatedShift: Partial<Shift>, updateSeries = false) => {
+  const updateShift = async (id: string, updatedShift: Partial<Shift>, updateSeries = false) => {
     console.log('Updating shift:', id, updatedShift, 'Update series:', updateSeries);
     
     const shiftToUpdate = shifts.find(s => s.id === id);
@@ -206,167 +247,189 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
     
-    if (updateSeries && shiftToUpdate.seriesId) {
-      // Get all shifts in the series
-      const seriesShifts = shifts.filter(s => s.seriesId === shiftToUpdate.seriesId);
-      
-      if (seriesShifts.length === 0) {
-        console.error('No shifts found in series:', shiftToUpdate.seriesId);
-        return;
-      }
-      
-      // Find the first shift in the series (chronologically)
-      const firstShift = seriesShifts.reduce((earliest, current) => {
-        return parseISO(current.startDate) < parseISO(earliest.startDate) ? current : earliest;
-      }, seriesShifts[0]);
-      
-      // If we're updating dates or recurrence pattern, we need to recalculate all shifts
-      const needsRecalculation = 
-        updatedShift.startDate !== undefined || 
-        updatedShift.endDate !== undefined || 
-        updatedShift.recurrencePattern !== undefined ||
-        updatedShift.recurrenceEndDate !== undefined;
-      
-      if (needsRecalculation) {
-        try {
-          // Remove all existing shifts in the series
-          const nonSeriesShifts = shifts.filter(s => s.seriesId !== shiftToUpdate.seriesId);
-          
-          // Create a new base shift with updated properties
-          const baseShift: Omit<Shift, 'id'> = {
-            ...firstShift,
-            ...updatedShift,
-            // Ensure we keep the seriesId
-            seriesId: firstShift.seriesId
-          };
-          
-          // Validate dates
-          if (!baseShift.startDate || !baseShift.endDate || !baseShift.recurrenceEndDate) {
-            console.error('Missing required dates for recurring shift');
-            return;
-          }
-          
-          // Ensure end date is not before start date
-          if (parseISO(baseShift.endDate) < parseISO(baseShift.startDate)) {
-            baseShift.endDate = baseShift.startDate;
-          }
-          
-          // Ensure recurrence end date is not before start date
-          if (parseISO(baseShift.recurrenceEndDate) < parseISO(baseShift.startDate)) {
-            baseShift.recurrenceEndDate = format(
-              addMonths(parseISO(baseShift.startDate), 3),
-              'yyyy-MM-dd'
-            );
-          }
-          
-          // Calculate the duration of the shift in days
-          const startDate = parseISO(baseShift.startDate);
-          const endDate = parseISO(baseShift.endDate);
-          const shiftDuration = differenceInDays(endDate, startDate);
-          
-          // Generate new recurring shifts based on the updated pattern
-          const newSeriesShifts: Shift[] = [];
-          
-          // Add the first shift
-          newSeriesShifts.push({
-            ...baseShift,
-            id: firstShift.id // Keep the original ID for the first shift
-          } as Shift);
-          
-          // Generate the rest of the series
-          let currentDate = startDate;
-          const recurrenceEndDate = parseISO(baseShift.recurrenceEndDate);
-          
-          // Map to keep track of existing shift IDs to reuse
-          const existingShiftIds = new Map<string, string>();
-          seriesShifts.forEach(shift => {
-            if (shift.id !== firstShift.id) {
-              existingShiftIds.set(shift.startDate, shift.id);
-            }
-          });
-          
-          // Prevent infinite loops by limiting the number of iterations
-          let iterationCount = 0;
-          const MAX_ITERATIONS = 100; // Reasonable limit for most use cases
-          
-          while (iterationCount < MAX_ITERATIONS) {
-            let nextDate: Date;
+    try {
+      if (updateSeries && shiftToUpdate.seriesId) {
+        // Get all shifts in the series
+        const seriesShifts = shifts.filter(s => s.seriesId === shiftToUpdate.seriesId);
+        
+        if (seriesShifts.length === 0) {
+          console.error('No shifts found in series:', shiftToUpdate.seriesId);
+          return;
+        }
+        
+        // Find the first shift in the series (chronologically)
+        const firstShift = seriesShifts.reduce((earliest, current) => {
+          return parseISO(current.startDate) < parseISO(earliest.startDate) ? current : earliest;
+        }, seriesShifts[0]);
+        
+        // If we're updating dates or recurrence pattern, we need to recalculate all shifts
+        const needsRecalculation = 
+          updatedShift.startDate !== undefined || 
+          updatedShift.endDate !== undefined || 
+          updatedShift.recurrencePattern !== undefined ||
+          updatedShift.recurrenceEndDate !== undefined;
+        
+        if (needsRecalculation) {
+          try {
+            // Remove all existing shifts in the series
+            const nonSeriesShifts = shifts.filter(s => s.seriesId !== shiftToUpdate.seriesId);
             
-            // Calculate the next occurrence based on the pattern
-            switch (baseShift.recurrencePattern) {
-              case 'daily':
-                nextDate = addDays(currentDate, 1);
-                break;
-              case 'weekly':
-                nextDate = addDays(currentDate, 7);
-                break;
-              case 'biweekly':
-                nextDate = addDays(currentDate, 14);
-                break;
-              case 'monthly':
-                // Create a new date to avoid mutating the original
-                nextDate = new Date(currentDate);
-                nextDate.setMonth(nextDate.getMonth() + 1);
-                break;
-              default:
-                nextDate = addDays(currentDate, 7); // Default to weekly
+            // Create a new base shift with updated properties
+            const baseShift: Omit<Shift, 'id'> = {
+              ...firstShift,
+              ...updatedShift,
+              // Ensure we keep the seriesId
+              seriesId: firstShift.seriesId
+            };
+            
+            // Validate dates
+            if (!baseShift.startDate || !baseShift.endDate || !baseShift.recurrenceEndDate) {
+              console.error('Missing required dates for recurring shift');
+              return;
             }
             
-            // Break if we've passed the recurrence end date
-            if (nextDate > recurrenceEndDate) {
-              break;
+            // Ensure end date is not before start date
+            if (parseISO(baseShift.endDate) < parseISO(baseShift.startDate)) {
+              baseShift.endDate = baseShift.startDate;
             }
             
-            // Format dates for the new shift
-            const nextShiftStartDate = format(nextDate, 'yyyy-MM-dd');
-            const nextShiftEndDate = format(addDays(nextDate, shiftDuration), 'yyyy-MM-dd');
+            // Ensure recurrence end date is not before start date
+            if (parseISO(baseShift.recurrenceEndDate) < parseISO(baseShift.startDate)) {
+              baseShift.recurrenceEndDate = format(
+                addMonths(parseISO(baseShift.startDate), 3),
+                'yyyy-MM-dd'
+              );
+            }
             
-            // Check if we have an existing shift ID for this date
-            const existingId = existingShiftIds.get(nextShiftStartDate) || uuidv4();
+            // Calculate the duration of the shift in days
+            const startDate = parseISO(baseShift.startDate);
+            const endDate = parseISO(baseShift.endDate);
+            const shiftDuration = differenceInDays(endDate, startDate);
             
-            // Add the recurring shift
-            newSeriesShifts.push({
+            // Generate new recurring shifts based on the updated pattern
+            const newSeriesShifts: Shift[] = [];
+            
+            // First, delete all shifts in the series except the first one from the database
+            for (const shift of seriesShifts) {
+              if (shift.id !== firstShift.id) {
+                await databaseService.deleteShift(shift.id);
+              }
+            }
+            
+            // Update the first shift in the database
+            const updatedFirstShift = {
               ...baseShift,
-              id: existingId,
-              startDate: nextShiftStartDate,
-              endDate: nextShiftEndDate
-            } as Shift);
+              id: firstShift.id
+            } as Shift;
             
-            // Move to the next date
-            currentDate = nextDate;
-            iterationCount++;
+            await databaseService.updateShift(firstShift.id, updatedFirstShift);
+            
+            // Add the first shift to our new array
+            newSeriesShifts.push(updatedFirstShift);
+            
+            // Generate the rest of the series
+            let currentDate = startDate;
+            const recurrenceEndDate = parseISO(baseShift.recurrenceEndDate);
+            
+            // Prevent infinite loops by limiting the number of iterations
+            let iterationCount = 0;
+            const MAX_ITERATIONS = 100; // Reasonable limit for most use cases
+            
+            while (iterationCount < MAX_ITERATIONS) {
+              let nextDate: Date;
+              
+              // Calculate the next occurrence based on the pattern
+              switch (baseShift.recurrencePattern) {
+                case 'daily':
+                  nextDate = addDays(currentDate, 1);
+                  break;
+                case 'weekly':
+                  nextDate = addDays(currentDate, 7);
+                  break;
+                case 'biweekly':
+                  nextDate = addDays(currentDate, 14);
+                  break;
+                case 'monthly':
+                  // Create a new date to avoid mutating the original
+                  nextDate = new Date(currentDate);
+                  nextDate.setMonth(nextDate.getMonth() + 1);
+                  break;
+                default:
+                  nextDate = addDays(currentDate, 7); // Default to weekly
+              }
+              
+              // Break if we've passed the recurrence end date
+              if (nextDate > recurrenceEndDate) {
+                break;
+              }
+              
+              // Format dates for the new shift
+              const nextShiftStartDate = format(nextDate, 'yyyy-MM-dd');
+              const nextShiftEndDate = format(addDays(nextDate, shiftDuration), 'yyyy-MM-dd');
+              
+              // Create a new shift
+              const newShift = {
+                ...baseShift,
+                id: uuidv4(),
+                startDate: nextShiftStartDate,
+                endDate: nextShiftEndDate
+              } as Shift;
+              
+              // Add to database
+              const newShiftId = await databaseService.addShift(newShift);
+              
+              // Add to our array
+              newSeriesShifts.push({
+                ...newShift,
+                id: newShiftId || newShift.id
+              });
+              
+              // Move to the next date
+              currentDate = nextDate;
+              iterationCount++;
+            }
+            
+            if (iterationCount >= MAX_ITERATIONS) {
+              console.warn('Reached maximum number of iterations when generating recurring shifts');
+            }
+            
+            console.log('Updating recurring shifts:', newSeriesShifts.length, 'shifts');
+            setShifts([...nonSeriesShifts, ...newSeriesShifts]);
+          } catch (error) {
+            console.error('Error updating recurring shifts:', error);
+          }
+        } else {
+          // For non-date updates (like provider, clinic type, etc.), update each shift in the series
+          for (const shift of seriesShifts) {
+            await databaseService.updateShift(shift.id, updatedShift);
           }
           
-          if (iterationCount >= MAX_ITERATIONS) {
-            console.warn('Reached maximum number of iterations when generating recurring shifts');
-          }
-          
-          console.log('Updating recurring shifts:', newSeriesShifts);
-          setShifts([...nonSeriesShifts, ...newSeriesShifts]);
-        } catch (error) {
-          console.error('Error updating recurring shifts:', error);
+          // Update local state
+          setShifts(
+            shifts.map(shift => 
+              shift.seriesId === shiftToUpdate.seriesId 
+                ? { ...shift, ...updatedShift } 
+                : shift
+            )
+          );
         }
       } else {
-        // For non-date updates (like provider, clinic type, etc.), just update all shifts
+        // Update only this shift in the database
+        await databaseService.updateShift(id, updatedShift);
+        
+        // Update local state
         setShifts(
           shifts.map(shift => 
-            shift.seriesId === shiftToUpdate.seriesId 
-              ? { ...shift, ...updatedShift } 
-              : shift
+            shift.id === id ? { ...shift, ...updatedShift } : shift
           )
         );
       }
-    } else {
-      // Update only this shift
-      setShifts(
-        shifts.map(shift => 
-          shift.id === id ? { ...shift, ...updatedShift } : shift
-        )
-      );
+    } catch (error) {
+      console.error('Error updating shift:', error);
     }
   };
 
-  const deleteShift = (id: string, deleteSeries = false) => {
+  const deleteShift = async (id: string, deleteSeries = false) => {
     console.log('Deleting shift:', id, 'Delete series:', deleteSeries);
     
     const shiftToDelete = shifts.find(s => s.id === id);
@@ -378,50 +441,79 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // by its ID if we're in delete series mode and have the ID in the modal state
       if (deleteSeries && modalState.shift?.seriesId) {
         console.log('Attempting to delete series by seriesId:', modalState.shift.seriesId);
-        setShifts(
-          shifts.filter(shift => shift.seriesId !== modalState.shift?.seriesId)
-        );
+        
+        try {
+          // Delete all shifts in the series from the database first
+          const shiftsToDelete = shifts.filter(s => s.seriesId === modalState.shift?.seriesId);
+          for (const shift of shiftsToDelete) {
+            await databaseService.deleteShift(shift.id);
+          }
+          
+          // Then update local state
+          setShifts(shifts.filter(shift => shift.seriesId !== modalState.shift?.seriesId));
+        } catch (error) {
+          console.error('Error deleting shift series:', error);
+        }
       }
       
       return;
     }
     
-    if (deleteSeries && shiftToDelete.seriesId) {
-      // Delete all shifts in the series
-      console.log('Deleting all shifts in series:', shiftToDelete.seriesId);
-      setShifts(
-        shifts.filter(shift => shift.seriesId !== shiftToDelete.seriesId)
-      );
-    } else {
-      // Delete only this shift
-      console.log('Deleting single shift:', id);
-      
-      // Create a new array with the filtered shifts to avoid reference issues
-      const updatedShifts = shifts.filter(shift => shift.id !== id);
-      
-      // If this was part of a series, handle series cleanup
-      if (shiftToDelete.seriesId) {
-        const remainingSeriesShifts = shifts.filter(
-          shift => shift.seriesId === shiftToDelete.seriesId && shift.id !== id
-        );
+    try {
+      if (deleteSeries && shiftToDelete.seriesId) {
+        // Delete all shifts in the series from the database first
+        const shiftsToDelete = shifts.filter(s => s.seriesId === shiftToDelete.seriesId);
+        console.log('Deleting all shifts in series:', shiftToDelete.seriesId, shiftsToDelete.length, 'shifts');
         
-        if (remainingSeriesShifts.length === 0) {
-          console.log('Last shift in series deleted, cleaning up series:', shiftToDelete.seriesId);
-        } else if (remainingSeriesShifts.length === 1) {
-          // If only one shift remains in the series, remove the series ID from it
-          console.log('Only one shift remains in series, removing series ID');
-          const lastShift = remainingSeriesShifts[0];
-          updatedShifts.forEach(shift => {
-            if (shift.id === lastShift.id) {
-              shift.seriesId = undefined;
-              shift.isRecurring = false;
-            }
-          });
+        for (const shift of shiftsToDelete) {
+          await databaseService.deleteShift(shift.id);
         }
+        
+        // Then update local state
+        setShifts(shifts.filter(shift => shift.seriesId !== shiftToDelete.seriesId));
+      } else {
+        // Delete only this shift from the database first
+        console.log('Deleting single shift:', id);
+        await databaseService.deleteShift(id);
+        
+        // Create a new array with the filtered shifts to avoid reference issues
+        const updatedShifts = shifts.filter(shift => shift.id !== id);
+        
+        // If this was part of a series, handle series cleanup
+        if (shiftToDelete.seriesId) {
+          const remainingSeriesShifts = shifts.filter(
+            shift => shift.seriesId === shiftToDelete.seriesId && shift.id !== id
+          );
+          
+          if (remainingSeriesShifts.length === 0) {
+            console.log('Last shift in series deleted, cleaning up series:', shiftToDelete.seriesId);
+          } else if (remainingSeriesShifts.length === 1) {
+            // If only one shift remains in the series, remove the series ID from it
+            console.log('Only one shift remains in series, removing series ID');
+            const lastShift = remainingSeriesShifts[0];
+            
+            // Update in database
+            await databaseService.updateShift(lastShift.id, {
+              ...lastShift,
+              seriesId: undefined,
+              isRecurring: false
+            });
+            
+            // Update in local state
+            updatedShifts.forEach(shift => {
+              if (shift.id === lastShift.id) {
+                shift.seriesId = undefined;
+                shift.isRecurring = false;
+              }
+            });
+          }
+        }
+        
+        // Update the shifts state with our modified array
+        setShifts(updatedShifts);
       }
-      
-      // Update the shifts state with our modified array
-      setShifts(updatedShifts);
+    } catch (error) {
+      console.error('Error deleting shift:', error);
     }
   };
 
@@ -525,6 +617,25 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await loadShifts();
   };
 
+  // Add a more thorough refresh function to handle inconsistencies
+  const forceRefreshShifts = async () => {
+    console.log('Forcing complete refresh of shifts from database');
+    setLoading(true);
+    try {
+      // Clear the local state first
+      setShifts([]);
+      
+      // Then load fresh data from the database
+      await loadShifts();
+      
+      console.log('Shifts refreshed successfully');
+    } catch (error) {
+      console.error('Error during forced refresh:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ShiftContext.Provider
       value={{
@@ -542,7 +653,8 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         closeModal,
         exportShifts,
         importShifts,
-        refreshShifts
+        refreshShifts,
+        forceRefreshShifts
       }}
     >
       {children}
