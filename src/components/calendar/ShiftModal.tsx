@@ -365,27 +365,75 @@ const ShiftModal: React.FC = () => {
 
       console.log(`Deleting specific day: ${specificDeleteDate} from shift ${shift.id}`);
       console.log(`Shift dates: ${shift.startDate} to ${shift.endDate}`);
-
+      
+      // For recurring shifts, we need to break this instance from the series first
+      const isPartOfSeries = shift.seriesId && shift.isRecurring;
+      
       // If deleting the first day
       if (format(startDate, 'yyyy-MM-dd') === specificDeleteDate) {
         // Update the start date to the day after
         const newStartDate = format(addDays(deleteDate, 1), 'yyyy-MM-dd');
         console.log(`Updating shift start date to: ${newStartDate}`);
-        updateShift(shift.id, { startDate: newStartDate }, false);
+        
+        // If this is part of a series, we need to break it from the series first
+        if (isPartOfSeries) {
+          console.log('Breaking shift from series before updating');
+          // Create a modified shift without the seriesId
+          const updatedShift = { 
+            ...shift, 
+            startDate: newStartDate,
+            seriesId: undefined 
+          };
+          // Update the shift with the new data
+          updateShift(shift.id, updatedShift, false);
+        } else {
+          // Regular update for non-recurring shifts
+          updateShift(shift.id, { startDate: newStartDate }, false);
+        }
       } 
       // If deleting the last day
       else if (format(endDate, 'yyyy-MM-dd') === specificDeleteDate) {
         // Update the end date to the day before
         const newEndDate = format(addDays(deleteDate, -1), 'yyyy-MM-dd');
         console.log(`Updating shift end date to: ${newEndDate}`);
-        updateShift(shift.id, { endDate: newEndDate }, false);
+        
+        // If this is part of a series, we need to break it from the series first
+        if (isPartOfSeries) {
+          console.log('Breaking shift from series before updating');
+          // Create a modified shift without the seriesId
+          const updatedShift = { 
+            ...shift, 
+            endDate: newEndDate,
+            seriesId: undefined 
+          };
+          // Update the shift with the new data
+          updateShift(shift.id, updatedShift, false);
+        } else {
+          // Regular update for non-recurring shifts
+          updateShift(shift.id, { endDate: newEndDate }, false);
+        }
       } 
       // If deleting a day in the middle, we need to split the shift into two
       else {
         // First, update the current shift to end the day before the deleted day
         const newEndDate = format(addDays(deleteDate, -1), 'yyyy-MM-dd');
         console.log(`Updating first part end date to: ${newEndDate}`);
-        updateShift(shift.id, { endDate: newEndDate }, false);
+        
+        // If this is part of a series, we need to break it from the series first
+        if (isPartOfSeries) {
+          console.log('Breaking shift from series before splitting');
+          // Create a modified shift without the seriesId
+          const updatedShift = { 
+            ...shift, 
+            endDate: newEndDate,
+            seriesId: undefined 
+          };
+          // Update the shift with the new data
+          updateShift(shift.id, updatedShift, false);
+        } else {
+          // Regular update for non-recurring shifts
+          updateShift(shift.id, { endDate: newEndDate }, false);
+        }
         
         // Then create a new shift starting the day after the deleted day
         const newStartDate = format(addDays(deleteDate, 1), 'yyyy-MM-dd');
@@ -397,10 +445,11 @@ const ShiftModal: React.FC = () => {
           endDate: shift.endDate,
           isVacation: shift.isVacation,
           notes: shift.notes,
-          isRecurring: shift.isRecurring,
-          recurrencePattern: shift.recurrencePattern,
-          recurrenceEndDate: shift.recurrenceEndDate,
-          seriesId: shift.seriesId
+          // For the new shift, don't include it in the recurring series
+          isRecurring: isPartOfSeries ? false : shift.isRecurring,
+          recurrencePattern: isPartOfSeries ? undefined : shift.recurrencePattern,
+          recurrenceEndDate: isPartOfSeries ? undefined : shift.recurrenceEndDate,
+          seriesId: isPartOfSeries ? undefined : shift.seriesId
         };
         
         console.log(`Creating new shift from: ${newStartDate} to ${shift.endDate}`);
@@ -648,6 +697,22 @@ const ShiftModal: React.FC = () => {
                   This shift is part of a recurring pattern but recurrence has been disabled. Saving will remove it from the pattern.
                 </Typography>
               )}
+              
+              {/* Add clarifying message for multi-day recurring shifts */}
+              {formData.isRecurring && formData.startDate && formData.endDate && 
+               formData.startDate !== formData.endDate && (
+                <Alert severity="info" sx={{ mt: 1, mb: 1 }}>
+                  <Typography variant="body2">
+                    <strong>Note:</strong> This is both a multi-day shift and a recurring shift.
+                  </Typography>
+                  <Typography variant="body2">
+                    • When editing a single instance, it will be removed from the recurring series.
+                  </Typography>
+                  <Typography variant="body2">
+                    • When deleting a specific day, that day will be removed from this instance only.
+                  </Typography>
+                </Alert>
+              )}
             </Grid>
             
             <Collapse in={formData.isRecurring || false} sx={{ width: '100%' }}>
@@ -708,6 +773,21 @@ const ShiftModal: React.FC = () => {
                 <Typography variant="subtitle2" gutterBottom>
                   Choose which occurrences to update
                 </Typography>
+                
+                {/* Add clarifying message for multi-day recurring shifts */}
+                {isMultiDayShift && (
+                  <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Note:</strong> When updating a multi-day shift in a recurring series:
+                    </Typography>
+                    <Typography variant="body2">
+                      • "Only this occurrence" will break this instance from the series
+                    </Typography>
+                    <Typography variant="body2">
+                      • "All occurrences" will update the entire recurring pattern
+                    </Typography>
+                  </Alert>
+                )}
                 
                 <FormControl component="fieldset">
                   <RadioGroup
@@ -779,6 +859,16 @@ const ShiftModal: React.FC = () => {
                   <Typography variant="subtitle2" gutterBottom>
                     Delete Options for Multi-Day Shift
                   </Typography>
+                  
+                  {/* Add clarifying message for multi-day recurring shifts */}
+                  {modalState.shift?.isRecurring && modalState.shift?.seriesId && (
+                    <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Note:</strong> When deleting a specific day from a recurring shift, 
+                        this instance will be removed from the recurring series.
+                      </Typography>
+                    </Alert>
+                  )}
                   
                   <FormControl component="fieldset">
                     <RadioGroup

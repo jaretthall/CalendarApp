@@ -272,11 +272,11 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     try {
-      // Handle recurring series updates
-      if (updateSeries && shiftToUpdate.seriesId && shiftToUpdate.isRecurring) {
-        console.log('Updating all shifts in recurring pattern');
+      // If this is part of a recurring series and we're updating the entire series
+      if (shiftToUpdate.seriesId && shiftToUpdate.isRecurring && updateSeries) {
+        console.log('Updating entire recurring series:', shiftToUpdate.seriesId);
         
-        // Get all shifts in the series
+        // Get all shifts in this series
         const seriesShifts = shifts.filter(s => s.seriesId === shiftToUpdate.seriesId);
         
         if (seriesShifts.length === 0) {
@@ -284,16 +284,17 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return;
         }
         
-        // Find the first shift in the series (chronologically)
+        // Find the first shift in the series (by start date)
         const firstShift = seriesShifts.reduce((earliest, current) => {
           return parseISO(current.startDate) < parseISO(earliest.startDate) ? current : earliest;
         }, seriesShifts[0]);
         
-        // If we're updating dates or recurrence pattern, we need to recalculate all shifts
+        // Check if we need to recalculate the entire series
+        // This is needed if we're changing dates or recurrence pattern
         const needsRecalculation = 
           updatedShift.startDate !== undefined || 
           updatedShift.endDate !== undefined || 
-          updatedShift.recurrencePattern !== undefined ||
+          updatedShift.recurrencePattern !== undefined || 
           updatedShift.recurrenceEndDate !== undefined;
         
         if (needsRecalculation) {
@@ -449,7 +450,12 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const individualShift = {
             ...shiftToUpdate,
             ...updatedShift,
-            seriesId: undefined
+            seriesId: undefined,
+            // Ensure we're explicitly setting isRecurring to false when breaking from series
+            isRecurring: false,
+            // Clear recurrence fields when breaking from series
+            recurrencePattern: undefined,
+            recurrenceEndDate: undefined
           };
           
           // Update in database
