@@ -147,7 +147,7 @@ const ShiftModal: React.FC = () => {
         formInitialized.current = true;
       }
     }
-  }, [modalState, activeProviders, activeClinicTypes]);
+  }, [modalState, activeProviders, activeClinicTypes, forceRefreshShifts]);
 
   // Memoize handlers to prevent unnecessary re-renders
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
