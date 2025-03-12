@@ -248,7 +248,10 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     try {
-      if (updateSeries && shiftToUpdate.seriesId) {
+      // Handle recurring series updates
+      if (updateSeries && shiftToUpdate.seriesId && shiftToUpdate.isRecurring) {
+        console.log('Updating all shifts in recurring pattern');
+        
         // Get all shifts in the series
         const seriesShifts = shifts.filter(s => s.seriesId === shiftToUpdate.seriesId);
         
@@ -414,15 +417,40 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           );
         }
       } else {
-        // Update only this shift in the database
-        await databaseService.updateShift(id, updatedShift);
-        
-        // Update local state
-        setShifts(
-          shifts.map(shift => 
-            shift.id === id ? { ...shift, ...updatedShift } : shift
-          )
-        );
+        // If this is part of a recurring series but we're only updating this instance
+        if (shiftToUpdate.seriesId && shiftToUpdate.isRecurring && !updateSeries) {
+          console.log('Updating single shift in recurring pattern - breaking from series');
+          
+          // Create a copy without the series ID to break it from the pattern
+          const individualShift = {
+            ...shiftToUpdate,
+            ...updatedShift,
+            seriesId: undefined
+          };
+          
+          // Update in database
+          await databaseService.updateShift(id, individualShift);
+          
+          // Update in local state
+          setShifts(
+            shifts.map(shift => 
+              shift.id === id ? individualShift : shift
+            )
+          );
+        } else {
+          // Regular single shift update
+          console.log('Updating single shift');
+          
+          // Update in database
+          await databaseService.updateShift(id, updatedShift);
+          
+          // Update in local state
+          setShifts(
+            shifts.map(shift => 
+              shift.id === id ? { ...shift, ...updatedShift } : shift
+            )
+          );
+        }
       }
     } catch (error) {
       console.error('Error updating shift:', error);

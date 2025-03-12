@@ -23,7 +23,7 @@ import {
   Radio
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { format, parseISO, addMonths, addDays } from 'date-fns';
+import { format, parseISO, addMonths, addDays, differenceInDays } from 'date-fns';
 import { useShifts, Shift } from '../../contexts/ShiftContext';
 import { useProviders } from '../../contexts/EmployeeContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
@@ -72,6 +72,7 @@ const ShiftModal: React.FC = () => {
   const [deleteSeries, setDeleteSeries] = useState(false);
   const [deleteOption, setDeleteOption] = useState<DeleteOptionType>('entire');
   const [specificDeleteDate, setSpecificDeleteDate] = useState<string | null>(null);
+  const [updateScope, setUpdateScope] = useState<'this' | 'future' | 'all'>('this');
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -277,7 +278,9 @@ const ShiftModal: React.FC = () => {
       if (modalState.mode === 'add') {
         addShift(shiftToSubmit);
       } else if (modalState.mode === 'edit' && modalState.shift) {
-        updateShift(modalState.shift.id, shiftToSubmit, updateSeries);
+        // Determine if we should update all occurrences based on the update scope
+        const shouldUpdateSeries = updateScope === 'all';
+        updateShift(modalState.shift.id, shiftToSubmit, shouldUpdateSeries);
       } else {
         console.error('Cannot update shift: No shift data in modal state');
       }
@@ -291,7 +294,7 @@ const ShiftModal: React.FC = () => {
     }
 
     closeModal();
-  }, [formData, modalState, isAuthenticated, updateSeries, addShift, updateShift, closeModal, forceRefreshShifts]);
+  }, [formData, modalState, isAuthenticated, updateScope, addShift, updateShift, closeModal, forceRefreshShifts]);
 
   // Check if the current shift spans multiple days
   const isMultiDayShift = useMemo(() => {
@@ -450,13 +453,19 @@ const ShiftModal: React.FC = () => {
     }
   }, [modalState.key]);
 
+  // Helper function to determine if a shift is part of a recurring series
+  const isRecurringSeries = useMemo(() => {
+    return modalState.mode === 'edit' && modalState.shift?.seriesId && modalState.shift?.isRecurring;
+  }, [modalState]);
+
   return (
-    <Dialog open={modalState.isOpen} onClose={closeModal} maxWidth="sm" fullWidth>
+    <Dialog open={modalState.isOpen} onClose={closeModal} maxWidth="md" fullWidth>
       <DialogTitle>
         {modalState.mode === 'add' ? 'Add Shift' : 'Edit Shift'}
         {modalState.mode === 'edit' && modalState.shift?.seriesId && (
           <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-            This shift is part of a recurring series
+            {isMultiDayShift ? 'This is a multi-day shift' : 'This is a single-day shift'}
+            {isRecurringSeries ? ' that is part of a recurring pattern' : ''}
           </Typography>
         )}
       </DialogTitle>
@@ -469,7 +478,17 @@ const ShiftModal: React.FC = () => {
         )}
         
         <Box sx={{ mt: 2 }}>
-          <Grid container spacing={2}>
+          {/* Section 1: Basic Shift Information */}
+          <Typography variant="h6" gutterBottom sx={{ 
+            backgroundColor: 'primary.light', 
+            color: 'primary.contrastText',
+            p: 1,
+            borderRadius: 1
+          }}>
+            Shift Details
+          </Typography>
+          
+          <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel id="provider-label">Provider</InputLabel>
@@ -510,26 +529,6 @@ const ShiftModal: React.FC = () => {
               </FormControl>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
-              <DatePicker
-                label="Start Date"
-                value={formData.startDate ? parseISO(formData.startDate) : null}
-                onChange={(date) => handleDateChange('startDate', date)}
-                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
-                disabled={!isAuthenticated}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <DatePicker
-                label="End Date"
-                value={formData.endDate ? parseISO(formData.endDate) : null}
-                onChange={(date) => handleDateChange('endDate', date)}
-                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
-                disabled={!isAuthenticated}
-              />
-            </Grid>
-            
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -556,12 +555,73 @@ const ShiftModal: React.FC = () => {
                 disabled={!isAuthenticated}
               />
             </Grid>
-            
-            <Grid item xs={12}>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle1">Recurring Shift</Typography>
+          </Grid>
+          
+          {/* Section 2: Shift Duration */}
+          <Typography variant="h6" gutterBottom sx={{ 
+            backgroundColor: 'secondary.light', 
+            color: 'secondary.contrastText',
+            p: 1,
+            borderRadius: 1
+          }}>
+            Shift Duration
+          </Typography>
+          
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              A shift can span a single day or multiple consecutive days
+            </Typography>
+          </Box>
+          
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6}>
+              <DatePicker
+                label="Start Date"
+                value={formData.startDate ? parseISO(formData.startDate) : null}
+                onChange={(date) => handleDateChange('startDate', date)}
+                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
+                disabled={!isAuthenticated}
+              />
             </Grid>
             
+            <Grid item xs={12} sm={6}>
+              <DatePicker
+                label="End Date"
+                value={formData.endDate ? parseISO(formData.endDate) : null}
+                onChange={(date) => handleDateChange('endDate', date)}
+                slotProps={{ textField: { fullWidth: true, disabled: !isAuthenticated } }}
+                disabled={!isAuthenticated}
+              />
+              {formData.startDate && formData.endDate && formData.startDate !== formData.endDate && (
+                <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
+                  This is a multi-day shift spanning {
+                    differenceInDays(
+                      parseISO(formData.endDate), 
+                      parseISO(formData.startDate)
+                    ) + 1
+                  } days
+                </Typography>
+              )}
+            </Grid>
+          </Grid>
+          
+          {/* Section 3: Recurrence Pattern */}
+          <Typography variant="h6" gutterBottom sx={{ 
+            backgroundColor: 'info.light', 
+            color: 'info.contrastText',
+            p: 1,
+            borderRadius: 1
+          }}>
+            Recurrence Pattern
+          </Typography>
+          
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              A shift can repeat according to a pattern (weekly, biweekly, etc.)
+            </Typography>
+          </Box>
+          
+          <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12}>
               <FormControlLabel
                 control={
@@ -572,16 +632,16 @@ const ShiftModal: React.FC = () => {
                     disabled={!isAuthenticated || (modalState.mode === 'edit' && modalState.shift?.seriesId !== undefined)}
                   />
                 }
-                label="Recurring"
+                label="Set as recurring"
               />
               {modalState.mode === 'edit' && modalState.shift?.seriesId && !formData.isRecurring && (
                 <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                  This shift is part of a series but recurrence has been disabled. Saving will remove it from the series.
+                  This shift is part of a recurring pattern but recurrence has been disabled. Saving will remove it from the pattern.
                 </Typography>
               )}
             </Grid>
             
-            <Collapse in={formData.isRecurring || false}>
+            <Collapse in={formData.isRecurring || false} sx={{ width: '100%' }}>
               <Grid container spacing={2} sx={{ mt: 0.5, pl: 2 }}>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
@@ -613,51 +673,91 @@ const ShiftModal: React.FC = () => {
                 </Grid>
               </Grid>
             </Collapse>
-            
-            {modalState.mode === 'edit' && modalState.shift?.seriesId && (
-              <Grid item xs={12}>
-                <Box sx={{ 
-                  mt: 2, 
-                  p: 2, 
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  bgcolor: 'background.paper'
-                }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Series Options
-                  </Typography>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={updateSeries}
-                        onChange={(e) => isAuthenticated && setUpdateSeries(e.target.checked)}
-                        disabled={!isAuthenticated}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body2">
-                          Update all shifts in this series
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Apply these changes to all recurring instances
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </Box>
-              </Grid>
-            )}
           </Grid>
-        </Box>
-      </DialogContent>
-      
-      <DialogActions>
-        {modalState.mode === 'edit' && (
-          <>
-            <Box sx={{ mr: 2 }}>
+          
+          {/* Section 4: Update Options for Edit Mode */}
+          {modalState.mode === 'edit' && isRecurringSeries && (
+            <>
+              <Typography variant="h6" gutterBottom sx={{ 
+                backgroundColor: 'warning.light', 
+                color: 'warning.contrastText',
+                p: 1,
+                borderRadius: 1
+              }}>
+                Update Scope
+              </Typography>
+              
+              <Box sx={{ 
+                mt: 2, 
+                p: 2, 
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                bgcolor: 'background.paper',
+                mb: 3
+              }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Choose which occurrences to update
+                </Typography>
+                
+                <FormControl component="fieldset">
+                  <RadioGroup
+                    value={updateScope}
+                    onChange={(e) => setUpdateScope(e.target.value as 'this' | 'future' | 'all')}
+                  >
+                    <FormControlLabel 
+                      value="this" 
+                      control={<Radio />} 
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            Only this occurrence
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Changes apply only to this specific shift
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <FormControlLabel 
+                      value="future" 
+                      control={<Radio />} 
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            This and all future occurrences
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Changes apply to this shift and all future shifts in this pattern
+                          </Typography>
+                        </Box>
+                      }
+                      disabled={true} // Future implementation
+                    />
+                    <FormControlLabel 
+                      value="all" 
+                      control={<Radio />} 
+                      label={
+                        <Box>
+                          <Typography variant="body2">
+                            All occurrences
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Changes apply to all shifts in this recurrence pattern
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </Box>
+            </>
+          )}
+          
+          {/* Section 5: Delete Options for Edit Mode */}
+          {modalState.mode === 'edit' && (
+            <Box sx={{ mb: 2 }}>
+              {/* If it's a multi-day shift, show day-specific deletion options */}
               {isMultiDayShift && (
                 <Box sx={{ 
                   border: '1px solid',
@@ -668,7 +768,7 @@ const ShiftModal: React.FC = () => {
                   bgcolor: 'background.paper'
                 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Delete Options
+                    Delete Options for Multi-Day Shift
                   </Typography>
                   
                   <FormControl component="fieldset">
@@ -679,24 +779,42 @@ const ShiftModal: React.FC = () => {
                       <FormControlLabel 
                         value="entire" 
                         control={<Radio size="small" />} 
-                        label="Delete entire shift" 
+                        label={
+                          <Box>
+                            <Typography variant="body2">
+                              Delete entire shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Removes the complete shift span
+                            </Typography>
+                          </Box>
+                        }
                       />
                       <FormControlLabel 
                         value="specific-day" 
                         control={<Radio size="small" />} 
-                        label="Delete specific day" 
+                        label={
+                          <Box>
+                            <Typography variant="body2">
+                              Delete only a specific day
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Removes a single day from this shift span
+                            </Typography>
+                          </Box>
+                        }
                       />
                     </RadioGroup>
                   </FormControl>
                   
                   {deleteOption === 'specific-day' && shiftDates.length > 0 && (
                     <FormControl fullWidth sx={{ mt: 1 }}>
-                      <InputLabel id="specific-day-label">Select Day</InputLabel>
+                      <InputLabel id="specific-day-label">Select Day to Remove</InputLabel>
                       <Select
                         labelId="specific-day-label"
                         value={specificDeleteDate || shiftDates[0].date}
                         onChange={(e) => setSpecificDeleteDate(e.target.value)}
-                        label="Select Day"
+                        label="Select Day to Remove"
                         size="small"
                       >
                         {shiftDates.map(date => (
@@ -710,37 +828,64 @@ const ShiftModal: React.FC = () => {
                 </Box>
               )}
               
-              <Button 
-                onClick={handleDelete} 
-                color="error"
-                variant="contained"
-                disabled={!isAuthenticated}
-                startIcon={<DeleteIcon />}
-              >
-                {deleteOption === 'specific-day' && isMultiDayShift 
-                  ? 'Delete Selected Day' 
-                  : 'Delete Shift'}
-              </Button>
-            </Box>
-            
-            {modalState.shift?.seriesId && deleteOption === 'entire' && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={deleteSeries}
-                    onChange={(e) => isAuthenticated && setDeleteSeries(e.target.checked)}
-                    disabled={!isAuthenticated || deleteOption !== 'entire'}
-                    color="error"
-                    size="small"
+              {/* If it's a recurring series, show series deletion options */}
+              {isRecurringSeries && (
+                <Box sx={{ 
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 2,
+                  mb: 2, 
+                  bgcolor: 'background.paper'
+                }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Delete Options for Recurring Pattern
+                  </Typography>
+                  
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={deleteSeries}
+                        onChange={(e) => isAuthenticated && setDeleteSeries(e.target.checked)}
+                        disabled={!isAuthenticated || deleteOption !== 'entire'}
+                        color="error"
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2">
+                          Delete all shifts in this recurring pattern
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Removes all related shifts following the same recurrence pattern
+                        </Typography>
+                      </Box>
+                    }
                   />
-                }
-                label="Delete all in series"
-              />
-            )}
-          </>
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+      
+      <DialogActions>
+        {modalState.mode === 'edit' && (
+          <Button 
+            onClick={handleDelete} 
+            color="error"
+            variant="contained"
+            disabled={!isAuthenticated}
+            startIcon={<DeleteIcon />}
+            sx={{ mr: 'auto' }}
+          >
+            {deleteOption === 'specific-day' && isMultiDayShift 
+              ? 'Delete Selected Day' 
+              : deleteSeries 
+                ? 'Delete All Recurring Shifts'
+                : 'Delete Shift'}
+          </Button>
         )}
-        
-        <Box sx={{ flexGrow: 1 }} />
         
         <Button onClick={closeModal}>Cancel</Button>
         <Button 
