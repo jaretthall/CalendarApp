@@ -381,7 +381,6 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setShifts(
           shifts.filter(shift => shift.seriesId !== modalState.shift?.seriesId)
         );
-        return;
       }
       
       return;
@@ -395,9 +394,12 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
     } else {
       // Delete only this shift
-      setShifts(shifts.filter(shift => shift.id !== id));
+      console.log('Deleting single shift:', id);
       
-      // If this was the last shift in a series, clean up the series
+      // Create a new array with the filtered shifts to avoid reference issues
+      const updatedShifts = shifts.filter(shift => shift.id !== id);
+      
+      // If this was part of a series, handle series cleanup
       if (shiftToDelete.seriesId) {
         const remainingSeriesShifts = shifts.filter(
           shift => shift.seriesId === shiftToDelete.seriesId && shift.id !== id
@@ -408,15 +410,18 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else if (remainingSeriesShifts.length === 1) {
           // If only one shift remains in the series, remove the series ID from it
           console.log('Only one shift remains in series, removing series ID');
-          setShifts(prevShifts => 
-            prevShifts.map(shift => 
-              shift.seriesId === shiftToDelete.seriesId
-                ? { ...shift, seriesId: undefined, isRecurring: false }
-                : shift
-            )
-          );
+          const lastShift = remainingSeriesShifts[0];
+          updatedShifts.forEach(shift => {
+            if (shift.id === lastShift.id) {
+              shift.seriesId = undefined;
+              shift.isRecurring = false;
+            }
+          });
         }
       }
+      
+      // Update the shifts state with our modified array
+      setShifts(updatedShifts);
     }
   };
 
@@ -452,6 +457,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setModalState({
       isOpen: false,
       mode: 'add',
+      shift: undefined, // Explicitly clear the shift reference
       key: uuidv4()
     });
     
@@ -461,6 +467,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isOpen: true,
         date,
         mode: 'add',
+        shift: undefined, // Explicitly ensure no shift data is present
         key: uuidv4() // Generate a new key to force re-render
       });
     }, 50);
@@ -493,6 +500,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setModalState({
       isOpen: false,
       mode: 'add',
+      shift: undefined, // Explicitly clear the shift reference
       key: uuidv4() // Generate a new key to force re-render
     });
   };

@@ -70,12 +70,32 @@ const ShiftModal: React.FC = () => {
   useEffect(() => {
     console.log('Modal state changed:', modalState);
     
+    // Always reset form data when modal state changes
+    if (!modalState.isOpen) {
+      // Reset form data to defaults when modal closes
+      setFormData({
+        providerId: activeProviders.length > 0 ? activeProviders[0].id : '',
+        clinicTypeId: activeClinicTypes.length > 0 ? activeClinicTypes[0].id : '',
+        startDate: '',
+        endDate: '',
+        isVacation: false,
+        notes: '',
+        isRecurring: false,
+        recurrencePattern: 'weekly' as RecurrencePattern,
+        recurrenceEndDate: ''
+      });
+      // Reset the initialization flag when modal closes
+      formInitialized.current = false;
+      return;
+    }
+    
     if (modalState.isOpen && !formInitialized.current) {
       if (modalState.mode === 'add' && modalState.date) {
         // Set default end date to same as start date
         const startDate = new Date(modalState.date);
         const recurrenceEndDate = addMonths(startDate, 3);
         
+        // Create a completely fresh object for new shifts
         const newFormData: Partial<Shift> = {
           providerId: activeProviders.length > 0 ? activeProviders[0].id : '',
           clinicTypeId: activeClinicTypes.length > 0 ? activeClinicTypes[0].id : '',
@@ -109,9 +129,6 @@ const ShiftModal: React.FC = () => {
         setDeleteSeries(false);
         formInitialized.current = true;
       }
-    } else if (!modalState.isOpen) {
-      // Reset the initialization flag when modal closes
-      formInitialized.current = false;
     }
   }, [modalState, activeProviders, activeClinicTypes]);
 
@@ -400,6 +417,15 @@ const ShiftModal: React.FC = () => {
 
   // Debug render
   console.log('Rendering ShiftModal with formData:', formData);
+
+  // Add an effect that runs when the modal key changes
+  useEffect(() => {
+    // Reset form initialized flag when the modal key changes
+    // This ensures we always get fresh form data
+    if (modalState.key) {
+      formInitialized.current = false;
+    }
+  }, [modalState.key]);
 
   return (
     <Dialog open={modalState.isOpen} onClose={closeModal} maxWidth="sm" fullWidth>
