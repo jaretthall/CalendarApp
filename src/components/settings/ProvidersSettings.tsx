@@ -119,7 +119,6 @@ const ProvidersSettings: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -136,7 +135,6 @@ const ProvidersSettings: React.FC = () => {
                       {provider.firstName} {provider.lastName}
                     </Box>
                   </TableCell>
-                  <TableCell>{provider.email || 'N/A'}</TableCell>
                   <TableCell>
                     <Chip
                       label={provider.status === 'active' ? 'Active' : 'Inactive'}
