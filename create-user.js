@@ -1,7 +1,16 @@
 // Script to create a test user in Firebase Authentication
 const { initializeApp } = require('firebase/app');
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Load environment variables from .env.local or .env file
+const result = dotenv.config({ path: path.resolve(process.cwd(), '.env.local') }) || 
+               dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+if (result.error) {
+  console.warn('Warning: .env file not found. Using environment variables or defaults.');
+}
 
 // Firebase configuration
 const firebaseConfig = {
@@ -11,8 +20,15 @@ const firebaseConfig = {
   storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_FIREBASE_APP_ID,
-  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-S19CRE4XM8"
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
+
+// Check if required configuration is available
+if (!firebaseConfig.apiKey) {
+  console.error('Error: Firebase API key not found in environment variables.');
+  console.error('Please ensure your .env or .env.local file contains REACT_APP_FIREBASE_API_KEY');
+  process.exit(1);
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

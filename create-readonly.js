@@ -1,17 +1,34 @@
 // Script to create a read-only user in Firebase Authentication
 const { initializeApp } = require('firebase/app');
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth');
+const dotenv = require('dotenv');
+const path = require('path');
 
-// Firebase configuration with values directly from .env.local
+// Load environment variables from .env.local or .env file
+const result = dotenv.config({ path: path.resolve(process.cwd(), '.env.local') }) || 
+               dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+if (result.error) {
+  console.warn('Warning: .env file not found. Using environment variables or defaults.');
+}
+
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyC8HbeEYkFb99Av6lA4uBGPdgSRtMHHMEo",
-  authDomain: "calendarapp-1148.firebaseapp.com",
-  projectId: "calendarapp-1148",
-  storageBucket: "calendarapp-1148.firebasestorage.app",
-  messagingSenderId: "48561938511",
-  appId: "1:48561938511:web:78aee1298a65a050510a3a",
-  measurementId: "G-S19CRE4XM8"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
+
+// Check if required configuration is available
+if (!firebaseConfig.apiKey) {
+  console.error('Error: Firebase API key not found in environment variables.');
+  console.error('Please ensure your .env or .env.local file contains REACT_APP_FIREBASE_API_KEY');
+  process.exit(1);
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

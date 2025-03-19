@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EditorState, convertToRaw, ContentState, convertFromHTML } from 'draft-js';
+import { EditorState, convertToRaw, ContentState } from 'draft-js';
 import { Editor } from 'react-draft-wysiwyg';
 import draftToHtml from 'draftjs-to-html';
 import htmlToDraft from 'html-to-draftjs';
@@ -27,9 +27,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     try {
       if (content) {
         const blocksFromHtml = htmlToDraft(content);
-        const { contentBlocks, entityMap } = blocksFromHtml;
-        const contentState = ContentState.createFromBlockArray(contentBlocks, entityMap);
-        return EditorState.createWithContent(contentState);
+        if (blocksFromHtml) {
+          const { contentBlocks, entityMap } = blocksFromHtml;
+          const contentState = ContentState.createFromBlockArray(contentBlocks, entityMap);
+          return EditorState.createWithContent(contentState);
+        }
       }
     } catch (error) {
       console.error('Error converting HTML to Draft.js state:', error);
@@ -41,14 +43,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     try {
       if (content && !editorState.getCurrentContent().hasText()) {
         const blocksFromHtml = htmlToDraft(content);
-        const { contentBlocks, entityMap } = blocksFromHtml;
-        const contentState = ContentState.createFromBlockArray(contentBlocks, entityMap);
-        setEditorState(EditorState.createWithContent(contentState));
+        if (blocksFromHtml) {
+          const { contentBlocks, entityMap } = blocksFromHtml;
+          const contentState = ContentState.createFromBlockArray(contentBlocks, entityMap);
+          setEditorState(EditorState.createWithContent(contentState));
+        }
       }
     } catch (error) {
       console.error('Error updating Draft.js content:', error);
     }
-  }, [content]);
+  }, [content, editorState]);
 
   const handleEditorChange = (state: EditorState) => {
     setEditorState(state);

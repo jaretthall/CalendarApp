@@ -5,10 +5,10 @@ import {
   Paper,
   Grid,
   IconButton,
-  Tooltip,
+  useTheme,
   ToggleButtonGroup,
   ToggleButton,
-  useTheme
+  Tooltip
 } from '@mui/material';
 import {
   ArrowBack,
@@ -21,12 +21,10 @@ import {
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
+  isToday,
   isSameMonth,
   addMonths,
-  subMonths,
-  isToday,
-  parseISO,
-  isWithinInterval
+  subMonths
 } from 'date-fns';
 import { useShifts } from '../../contexts/ShiftContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
@@ -46,11 +44,10 @@ const MonthView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [splitView, setSplitView] = useState(false); // Default to combined view
   const activeClinicTypes = getActiveClinicTypes();
-
-  // Debug log to check authentication state
+  
   useEffect(() => {
-    console.log('Authentication state:', isAuthenticated);
-  }, [isAuthenticated]);
+    console.log('MonthView rendered with date:', currentDate);
+  }, [currentDate]);
 
   const handlePrevMonth = () => {
     setCurrentDate(subMonths(currentDate, 1));
@@ -256,105 +253,108 @@ const MonthView: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" component="h1">
-          {format(currentDate, 'MMMM yyyy')}
-        </Typography>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton onClick={handlePrevMonth}>
-            <ArrowBack />
-          </IconButton>
+    <React.Fragment>
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h4" component="h1">
+            {format(currentDate, 'MMMM yyyy')}
+          </Typography>
           
-          <IconButton onClick={handleToday} sx={{ mx: 1 }}>
-            <Typography variant="button">Today</Typography>
-          </IconButton>
-          
-          <IconButton onClick={handleNextMonth}>
-            <ArrowForward />
-          </IconButton>
-          
-          <ToggleButtonGroup
-            value={splitView}
-            exclusive
-            onChange={handleViewChange}
-            aria-label="view mode"
-            size="small"
-            sx={{ ml: 2 }}
-          >
-            <ToggleButton value={false} aria-label="combined view">
-              <ViewDay />
-            </ToggleButton>
-            <ToggleButton value={true} aria-label="split view">
-              <ViewWeek />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton onClick={handlePrevMonth}>
+              <ArrowBack />
+            </IconButton>
+            
+            <IconButton onClick={handleToday} sx={{ mx: 1 }}>
+              <Typography variant="button">Today</Typography>
+            </IconButton>
+            
+            <IconButton onClick={handleNextMonth}>
+              <ArrowForward />
+            </IconButton>
+            
+            <ToggleButtonGroup
+              value={splitView}
+              exclusive
+              onChange={handleViewChange}
+              aria-label="view mode"
+              size="small"
+              sx={{ ml: 2 }}
+            >
+              <ToggleButton value={false} aria-label="combined view">
+                <ViewDay />
+              </ToggleButton>
+              <ToggleButton value={true} aria-label="split view">
+                <ViewWeek />
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
         </Box>
-      </Box>
-      
-      <Box id="calendar-container" className="calendar-container">
-        {splitView && activeClinicTypes.length > 1 ? (
-          // Month view with vertical split (side by side)
-          <Grid container spacing={2}>
-            {activeClinicTypes.map(clinicType => (
-              <Grid item xs={12} md={6} key={clinicType.id}>
-                <Paper sx={{ p: 2, mb: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    {clinicType.name}
-                  </Typography>
-                  
-                  <Grid container className="calendar-grid">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <Grid item xs={12 / 7} key={day} className="calendar-day-header">
-                        <Typography variant="subtitle2" align="center">
-                          {day}
-                        </Typography>
-                      </Grid>
-                    ))}
+        
+        <Box id="calendar-container" className="calendar-container">
+          {splitView && activeClinicTypes.length > 1 ? (
+            // Split view code
+            <Grid container spacing={2}>
+              {activeClinicTypes.map(clinicType => (
+                <Grid item xs={12} md={6} key={clinicType.id}>
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                      {clinicType.name}
+                    </Typography>
                     
-                    {weeks.map((week, weekIndex) => (
-                      <React.Fragment key={`week-${weekIndex}`}>
-                        {week.map((day, dayIndex) => (
-                          <Grid item xs={12 / 7} key={`${weekIndex}-${dayIndex}`}>
-                            {renderDay(day, clinicType.id)}
-                          </Grid>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </Grid>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Paper sx={{ p: 2 }}>
-            <Grid container className="calendar-grid">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <Grid item xs={12 / 7} key={day} className="calendar-day-header">
-                  <Typography variant="subtitle2" align="center">
-                    {day}
-                  </Typography>
+                    <Grid container className="calendar-grid">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <Grid item xs={12 / 7} key={day} className="calendar-day-header">
+                          <Typography variant="subtitle2" align="center">
+                            {day}
+                          </Typography>
+                        </Grid>
+                      ))}
+                      
+                      {weeks.map((week, weekIndex) => (
+                        <React.Fragment key={`week-${weekIndex}`}>
+                          {week.map((day, dayIndex) => (
+                            <Grid item xs={12 / 7} key={`${weekIndex}-${dayIndex}`}>
+                              {renderDay(day, clinicType.id)}
+                            </Grid>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </Grid>
+                  </Paper>
                 </Grid>
               ))}
-              
-              {weeks.map((week, weekIndex) => (
-                <React.Fragment key={`week-${weekIndex}`}>
-                  {week.map((day, dayIndex) => (
-                    <Grid item xs={12 / 7} key={`${weekIndex}-${dayIndex}`}>
-                      {renderDay(day)}
-                    </Grid>
-                  ))}
-                </React.Fragment>
-              ))}
             </Grid>
-          </Paper>
-        )}
+          ) : (
+            // Combined view code
+            <Paper sx={{ p: 2 }}>
+              <Grid container className="calendar-grid">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <Grid item xs={12 / 7} key={day} className="calendar-day-header">
+                    <Typography variant="subtitle2" align="center">
+                      {day}
+                    </Typography>
+                  </Grid>
+                ))}
+                
+                {weeks.map((week, weekIndex) => (
+                  <React.Fragment key={`week-${weekIndex}`}>
+                    {week.map((day, dayIndex) => (
+                      <Grid item xs={12 / 7} key={`${weekIndex}-${dayIndex}`}>
+                        {renderDay(day)}
+                      </Grid>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </Grid>
+            </Paper>
+          )}
+        </Box>
       </Box>
       
       {/* Notes Section */}
       <NotesSection date={currentDate} />
-    </Box>
+    </React.Fragment>
   );
 };
 

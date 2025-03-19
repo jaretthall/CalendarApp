@@ -35,6 +35,7 @@ interface NotesSectionProps {
 }
 
 const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
+  console.log('Rendering NotesSection with date:', date); // Debug log
   const { note, comments, fetchNote, fetchComments, saveNote, addComment, deleteComment, loading } = useNotes();
   const { isAuthenticated, isReadOnly, currentUser } = useAuth();
   
@@ -50,8 +51,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   useEffect(() => {
     // Fetch notes and comments when date changes
     const fetchData = async () => {
-      await fetchNote(date);
-      await fetchComments(date);
+      console.log('NotesSection - Fetching data for date:', date);
+      console.log('NotesSection - Date format for fetch:', format(date, 'yyyy-MM'));
+      try {
+        await fetchNote(date);
+        await fetchComments(date);
+      } catch (error) {
+        console.error('NotesSection - Error fetching data:', error);
+        setError('Failed to load notes and comments');
+      }
     };
     
     fetchData();
@@ -59,15 +67,19 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
 
   useEffect(() => {
     // Update local state when note is loaded from context
+    console.log('NotesSection - Note updated in context:', note);
     if (note) {
       setNoteContent(note.content || '');
+      console.log('NotesSection - Note content set:', note.content.substring(0, 50) + '...');
     } else {
       setNoteContent('');
+      console.log('NotesSection - No note found, content cleared');
     }
   }, [note]);
 
   const handleNoteChange = (content: string) => {
     setNoteContent(content);
+    console.log('NotesSection - Note content changed');
   };
 
   const handleSaveNote = async () => {
@@ -140,8 +152,49 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   };
 
   return (
-    <Paper sx={{ mt: 3, p: 2 }}>
-      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
+    <Paper 
+      sx={{ 
+        mt: 4, 
+        p: 3, 
+        borderTop: '4px solid #1976d2', 
+        boxShadow: 3,
+        border: '1px solid #1976d2',
+        borderRadius: '8px',
+        position: 'relative',
+        bgcolor: '#f9fbff'
+      }}
+      id="notes-section"
+    >
+      <Typography 
+        variant="h5" 
+        gutterBottom 
+        sx={{ 
+          color: '#1976d2', 
+          mb: 2,
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}
+      >
+        Monthly Notes &amp; Comments
+      </Typography>
+      
+      {/* Debugging indicator */}
+      <Box 
+        sx={{ 
+          position: 'absolute', 
+          top: 10, 
+          right: 10, 
+          bgcolor: '#e3f2fd', 
+          px: 1, 
+          py: 0.5, 
+          borderRadius: 1,
+          fontSize: '0.75rem'
+        }}
+      >
+        {format(date, 'MMMM yyyy')}
+      </Box>
+      
+      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3, borderBottom: '1px solid #e0e0e0' }}>
         <Tab 
           icon={<NoteAltIcon />} 
           label="Notes" 
