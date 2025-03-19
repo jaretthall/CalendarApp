@@ -47,23 +47,31 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [lastFetchedDate, setLastFetchedDate] = useState<string>('');
 
   useEffect(() => {
-    // Fetch notes and comments when date changes
-    const fetchData = async () => {
-      console.log('NotesSection - Fetching data for date:', date);
-      console.log('NotesSection - Date format for fetch:', format(date, 'yyyy-MM'));
-      try {
-        await fetchNote(date);
-        await fetchComments(date);
-      } catch (error) {
-        console.error('NotesSection - Error fetching data:', error);
-        setError('Failed to load notes and comments');
-      }
-    };
+    // Only fetch when the month/year changes to prevent infinite loops
+    const currentDateFormat = format(date, 'yyyy-MM');
     
-    fetchData();
-  }, [date, fetchNote, fetchComments]);
+    if (currentDateFormat !== lastFetchedDate) {
+      console.log('NotesSection - Fetching data for date:', date);
+      console.log('NotesSection - Date format for fetch:', currentDateFormat);
+      
+      setLastFetchedDate(currentDateFormat);
+      
+      const fetchData = async () => {
+        try {
+          await fetchNote(date);
+          await fetchComments(date);
+        } catch (error) {
+          console.error('NotesSection - Error fetching data:', error);
+          setError('Failed to load notes and comments');
+        }
+      };
+      
+      fetchData();
+    }
+  }, [date, fetchNote, fetchComments, lastFetchedDate]);
 
   useEffect(() => {
     // Update local state when note is loaded from context
