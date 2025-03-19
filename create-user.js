@@ -23,6 +23,10 @@ const adminEmailFull = 'admin@clinicamedicos.org';
 const adminUsernameEmail = 'Admin@clinicamedicos.org';
 const password = 'FamMed25!';
 
+// Read-only user credentials (must match those in AuthContext.tsx)
+const readOnlyEmail = 'readonly@example.com';
+const readOnlyPassword = 'readonly';
+
 // Function to create a user and handle errors
 const createUser = async (email, password) => {
   try {
@@ -41,19 +45,23 @@ const createUser = async (email, password) => {
   }
 };
 
-// Create both admin users
-async function createAdminUsers() {
-  console.log('Creating admin users...');
+// Create both admin users and read-only user
+async function createUsers() {
+  console.log('Creating users...');
   
   await createUser(adminEmailFull, password);
   await createUser(adminUsernameEmail, password);
   
-  console.log('Admin user creation process completed.');
-  console.log('You can log in with either:');
+  // Create the read-only user
+  await createUser(readOnlyEmail, readOnlyPassword);
+  
+  console.log('User creation process completed.');
+  console.log('You can log in with:');
   console.log(`1. Email: ${adminEmailFull}, Password: ${password}`);
   console.log(`2. Username: Admin, Password: ${password}`);
+  console.log(`3. Read-only: ${readOnlyEmail}, Password: ${readOnlyPassword}`);
   
   process.exit(0);
 }
 
-createAdminUsers(); 
+createUsers(); 
