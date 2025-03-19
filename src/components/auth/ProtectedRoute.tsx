@@ -7,28 +7,34 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requireAdmin = false }) => {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin, isReadOnly } = useAuth();
   const location = useLocation();
 
   console.log('ProtectedRoute check:', { 
     isAuthenticated, 
     isAdmin, 
+    isReadOnly,
     requireAdmin, 
     path: location.pathname 
   });
 
-  if (!isAuthenticated) {
-    // Redirect to login page if not authenticated
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  // Anyone can access non-admin routes
+  if (!requireAdmin) {
+    return <Outlet />;
   }
 
-  // Temporarily bypass admin check for debugging
-  // if (requireAdmin && !isAdmin) {
-  //   // Redirect to home page if admin access is required but user is not an admin
-  //   return <Navigate to="/" replace />;
-  // }
+  // For admin routes, check if the user is admin
+  if (requireAdmin && !isAdmin) {
+    // If in read-only mode, redirect to login
+    if (isReadOnly) {
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    
+    // If logged in but not admin, redirect to home
+    return <Navigate to="/" replace />;
+  }
 
-  // Render the protected component
+  // Render the protected component for admin users
   return <Outlet />;
 };
 

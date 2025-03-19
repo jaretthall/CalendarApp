@@ -31,9 +31,11 @@ const READ_ONLY_EMAIL = 'readonly@example.com';
 const READ_ONLY_PASSWORD = 'readonly';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  // Initialize with read-only mode as true by default
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(true);
+  // Initialize as authenticated in read-only mode
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   
@@ -42,27 +44,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       
-      // Only set authenticated if not in read-only mode
+      // If we have a Firebase user and not in read-only mode, set authenticated
       if (user && !isReadOnly) {
         setIsAuthenticated(true);
-      } else if (!user) {
+        
+        // Check if user is admin by email
+        if (user.email) {
+          const admin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+                        user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase();
+          setIsAdmin(admin);
+          console.log('Auth state changed:', { 
+            email: user.email,
+            isAdmin: admin,
+            isReadOnly: isReadOnly,
+            shouldBeAdmin: user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+                          user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase(),
+            adminEmail: ADMIN_EMAIL,
+            adminUsername: ADMIN_USERNAME
+          });
+        }
+      } else if (!user && !isReadOnly) {
+        // If no Firebase user and not in read-only mode, set not authenticated
         setIsAuthenticated(false);
-      }
-      
-      // Check if user is admin by email
-      if (user && user.email) {
-        const admin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
-                      user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase();
-        setIsAdmin(admin);
-        console.log('Auth state changed:', { 
-          email: user.email,
-          isAdmin: admin,
-          shouldBeAdmin: user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
-                        user.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase(),
-          adminEmail: ADMIN_EMAIL,
-          adminUsername: ADMIN_USERNAME
-        });
-      } else {
         setIsAdmin(false);
         console.log('Auth state changed: Not logged in or no email');
       }
@@ -76,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      // Exit read-only mode when attempting to log in
+      setReadOnlyMode(false);
+      
       // Special case for admin login - allow both email and username
       if ((email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
            email.toLowerCase() === ADMIN_USERNAME.toLowerCase()) && 
@@ -87,9 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
       
-      // For read-only access with empty password, use read-only mode without actual authentication
+      // For read-only access with empty password, switch back to read-only mode
       if (email.trim() !== '' && password === '') {
-        console.log('Entering read-only mode (no Firebase authentication)');
+        console.log('Returning to read-only mode');
         setReadOnlyMode(true);
         return true;
       }
@@ -100,31 +106,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (error) {
       console.error('Login error:', error);
+      // If login fails, go back to read-only mode
+      setReadOnlyMode(true);
       return false;
     }
   };
 
   const logout = async (): Promise<void> => {
     try {
-      // If in read-only mode, just disable it
+      // If already in read-only mode, nothing to do
       if (isReadOnly) {
-        setReadOnlyMode(false);
         return;
       }
       
-      // Otherwise do a normal signout
+      // Otherwise do a normal signout and go back to read-only mode
       await signOut(auth);
+      setReadOnlyMode(true);
     } catch (error) {
       console.error('Logout error:', error);
+      // In case of error, still try to go back to read-only mode
+      setReadOnlyMode(true);
     }
   };
 
   const register = async (email: string, password: string): Promise<boolean> => {
     try {
+      // Exit read-only mode when registering
+      setReadOnlyMode(false);
       await createUserWithEmailAndPassword(auth, email, password);
       return true;
     } catch (error) {
       console.error('Registration error:', error);
+      // If registration fails, go back to read-only mode
+      setReadOnlyMode(true);
       return false;
     }
   };
@@ -132,8 +146,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to enable/disable read-only mode
   const setReadOnlyMode = (enabled: boolean) => {
     setIsReadOnly(enabled);
-    setIsAuthenticated(enabled); // In read-only mode, we're authenticated but with limited permissions
-    setIsAdmin(false); // Read-only users are never admins
+    setIsAuthenticated(enabled || (currentUser !== null)); // Authenticated if in read-only mode or if we have a Firebase user
+    if (enabled) {
+      setIsAdmin(false); // Read-only users are never admins
+    } else if (currentUser?.email) {
+      // When exiting read-only mode, recheck admin status based on current user
+      const admin = currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
+                    currentUser.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase();
+      setIsAdmin(admin);
+    }
+    console.log(`Read-only mode ${enabled ? 'enabled' : 'disabled'}`);
   };
 
   if (loading) {

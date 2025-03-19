@@ -8,7 +8,8 @@ import {
   Button,
   Alert,
   InputAdornment,
-  IconButton
+  IconButton,
+  Divider
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isReadOnly } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +27,13 @@ const LoginPage: React.FC = () => {
   
   // Get the redirect path from location state or default to '/'
   const from = location.state?.from?.pathname || '/';
+
+  // Immediately redirect to home if in read-only mode
+  React.useEffect(() => {
+    if (isReadOnly) {
+      navigate('/', { replace: true });
+    }
+  }, [isReadOnly, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,8 +106,11 @@ const LoginPage: React.FC = () => {
             Provider Schedule
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Sign in to access the application
+            Sign in to manage the application
           </Typography>
+          <Alert severity="info" sx={{ mt: 2, textAlign: 'left' }}>
+            You are currently in read-only mode. Login to make changes.
+          </Alert>
         </Box>
         
         {error && (
@@ -151,14 +162,20 @@ const LoginPage: React.FC = () => {
               Sign In
             </Button>
             
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                OR
+              </Typography>
+            </Divider>
+            
             <Button
               variant="outlined"
               color="secondary"
               fullWidth
-              onClick={handleReadOnlyAccess}
+              onClick={() => navigate('/')}
               disabled={loading}
             >
-              Read-Only Access
+              Return to Read-Only View
             </Button>
           </Box>
         </form>
