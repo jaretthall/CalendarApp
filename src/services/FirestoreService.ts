@@ -14,12 +14,15 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { firestore } from '../config/firebase-config';
+import { Note, Comment } from '../contexts/NoteContext';
 
 // Collection names
 const PROVIDERS_COLLECTION = 'providers';
 const SHIFTS_COLLECTION = 'shifts';
 const CLINIC_TYPES_COLLECTION = 'clinicTypes';
 const SYNC_LOGS_COLLECTION = 'syncLogs';
+const NOTES_COLLECTION = 'calendarNotes';
+const COMMENTS_COLLECTION = 'calendarComments';
 
 // Types
 export interface Provider {
@@ -68,6 +71,25 @@ export interface SyncLog {
   recordsProcessed?: number;
   errorMessage?: string;
   syncedAt: Date;
+}
+
+// Notes and Comments interfaces for Firestore
+export interface FirestoreNote {
+  id: string;
+  monthYear: string;
+  content: string;
+  lastModifiedBy?: string;
+  createdAt: Date;
+  modifiedAt: Date;
+}
+
+export interface FirestoreComment {
+  id: string;
+  monthYear: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: Date;
 }
 
 class FirestoreService {
@@ -604,7 +626,9 @@ class FirestoreService {
   async getAllDataForExport(): Promise<{
     providers: Provider[],
     clinicTypes: ClinicType[],
-    shifts: Shift[]
+    shifts: Shift[],
+    notes: FirestoreNote[],
+    comments: FirestoreComment[]
   }> {
     try {
       // Get all providers
@@ -614,106 +638,276 @@ class FirestoreService {
       const clinicTypes = await this.getClinicTypes();
       
       // Get all shifts
-      const shiftsQuery = query(collection(firestore, SHIFTS_COLLECTION));
-      const shiftsSnapshot = await getDocs(shiftsQuery);
-      const shifts = shiftsSnapshot.docs.map(doc => {
+      const shifts = await this.getAllShifts();
+      
+      // Get all notes
+      const notesQuery = query(collection(firestore, NOTES_COLLECTION));
+      const notesSnapshot = await getDocs(notesQuery);
+      const notes = notesSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
-          providerId: data.providerId,
-          clinicTypeId: data.clinicTypeId,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          isVacation: data.isVacation,
-          isRecurring: data.isRecurring,
-          recurrencePattern: data.recurrencePattern,
-          recurrenceEndDate: data.recurrenceEndDate,
-          seriesId: data.seriesId,
-          notes: data.notes,
-          location: data.location,
+          monthYear: data.monthYear,
+          content: data.content,
+          lastModifiedBy: data.lastModifiedBy,
           createdAt: (data.createdAt as Timestamp).toDate(),
-          updatedAt: (data.updatedAt as Timestamp).toDate()
+          modifiedAt: (data.modifiedAt as Timestamp).toDate()
         };
       });
       
-      return {
-        providers,
-        clinicTypes,
-        shifts
-      };
+      // Get all comments
+      const commentsQuery = query(collection(firestore, COMMENTS_COLLECTION));
+      const commentsSnapshot = await getDocs(commentsQuery);
+      const comments = commentsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          monthYear: data.monthYear,
+          userId: data.userId,
+          userName: data.userName,
+          content: data.content,
+          createdAt: (data.createdAt as Timestamp).toDate()
+        };
+      });
+      
+      return { providers, clinicTypes, shifts, notes, comments };
     } catch (error) {
-      console.error('Error exporting data:', error);
-      return {
-        providers: [],
-        clinicTypes: [],
-        shifts: []
-      };
+      console.error('Error getting all data for export:', error);
+      return { providers: [], clinicTypes: [], shifts: [], notes: [], comments: [] };
     }
   }
 
   async migrateData(data: {
     providers?: any[],
     clinicTypes?: any[],
-    shifts?: any[]
+    shifts?: any[],
+    notes?: any[],
+    comments?: any[]
   }): Promise<boolean> {
     try {
-      // Import providers
+      // Migrate providers
       if (data.providers && data.providers.length > 0) {
         for (const provider of data.providers) {
           const { id, ...providerData } = provider;
-          
-          // Add timestamps if they don't exist
-          if (!providerData.createdAt) {
-            providerData.createdAt = serverTimestamp();
-          }
-          if (!providerData.updatedAt) {
-            providerData.updatedAt = serverTimestamp();
-          }
-          
-          // Use setDoc to maintain the same ID
-          await setDoc(doc(firestore, PROVIDERS_COLLECTION, id), providerData);
+          await setDoc(doc(firestore, PROVIDERS_COLLECTION, id), {
+            ...providerData,
+            createdAt: providerData.createdAt instanceof Date 
+              ? Timestamp.fromDate(providerData.createdAt) 
+              : providerData.createdAt,
+            updatedAt: providerData.updatedAt instanceof Date 
+              ? Timestamp.fromDate(providerData.updatedAt) 
+              : providerData.updatedAt
+          });
         }
       }
       
-      // Import clinic types
+      // Migrate clinic types
       if (data.clinicTypes && data.clinicTypes.length > 0) {
         for (const clinicType of data.clinicTypes) {
           const { id, ...clinicTypeData } = clinicType;
-          
-          // Add timestamps if they don't exist
-          if (!clinicTypeData.createdAt) {
-            clinicTypeData.createdAt = serverTimestamp();
-          }
-          if (!clinicTypeData.updatedAt) {
-            clinicTypeData.updatedAt = serverTimestamp();
-          }
-          
-          // Use setDoc to maintain the same ID
-          await setDoc(doc(firestore, CLINIC_TYPES_COLLECTION, id), clinicTypeData);
+          await setDoc(doc(firestore, CLINIC_TYPES_COLLECTION, id), {
+            ...clinicTypeData,
+            createdAt: clinicTypeData.createdAt instanceof Date 
+              ? Timestamp.fromDate(clinicTypeData.createdAt) 
+              : clinicTypeData.createdAt,
+            updatedAt: clinicTypeData.updatedAt instanceof Date 
+              ? Timestamp.fromDate(clinicTypeData.updatedAt) 
+              : clinicTypeData.updatedAt
+          });
         }
       }
       
-      // Import shifts
+      // Migrate shifts
       if (data.shifts && data.shifts.length > 0) {
         for (const shift of data.shifts) {
           const { id, ...shiftData } = shift;
-          
-          // Add timestamps if they don't exist
-          if (!shiftData.createdAt) {
-            shiftData.createdAt = serverTimestamp();
-          }
-          if (!shiftData.updatedAt) {
-            shiftData.updatedAt = serverTimestamp();
-          }
-          
-          // Use setDoc to maintain the same ID
-          await setDoc(doc(firestore, SHIFTS_COLLECTION, id), shiftData);
+          await setDoc(doc(firestore, SHIFTS_COLLECTION, id), {
+            ...shiftData,
+            createdAt: shiftData.createdAt instanceof Date 
+              ? Timestamp.fromDate(shiftData.createdAt) 
+              : shiftData.createdAt,
+            updatedAt: shiftData.updatedAt instanceof Date 
+              ? Timestamp.fromDate(shiftData.updatedAt) 
+              : shiftData.updatedAt
+          });
+        }
+      }
+      
+      // Migrate notes
+      if (data.notes && data.notes.length > 0) {
+        for (const note of data.notes) {
+          const { id, ...noteData } = note;
+          await setDoc(doc(firestore, NOTES_COLLECTION, id), {
+            ...noteData,
+            createdAt: noteData.createdAt instanceof Date 
+              ? Timestamp.fromDate(noteData.createdAt) 
+              : noteData.createdAt,
+            modifiedAt: noteData.modifiedAt instanceof Date 
+              ? Timestamp.fromDate(noteData.modifiedAt) 
+              : noteData.modifiedAt
+          });
+        }
+      }
+      
+      // Migrate comments
+      if (data.comments && data.comments.length > 0) {
+        for (const comment of data.comments) {
+          const { id, ...commentData } = comment;
+          await setDoc(doc(firestore, COMMENTS_COLLECTION, id), {
+            ...commentData,
+            createdAt: commentData.createdAt instanceof Date 
+              ? Timestamp.fromDate(commentData.createdAt) 
+              : commentData.createdAt
+          });
         }
       }
       
       return true;
     } catch (error) {
       console.error('Error migrating data:', error);
+      return false;
+    }
+  }
+
+  // Notes methods
+  async getNoteForMonth(monthYear: string): Promise<Note | null> {
+    try {
+      const notesQuery = query(
+        collection(firestore, NOTES_COLLECTION),
+        where('monthYear', '==', monthYear)
+      );
+      
+      const snapshot = await getDocs(notesQuery);
+      
+      if (snapshot.empty) {
+        return null;
+      }
+      
+      const doc = snapshot.docs[0]; // Should only be one note per month
+      const data = doc.data();
+      
+      return {
+        monthYear: data.monthYear,
+        content: data.content,
+        lastModifiedBy: data.lastModifiedBy,
+        createdAt: (data.createdAt instanceof Timestamp) 
+          ? data.createdAt.toDate().toISOString() 
+          : data.createdAt,
+        modifiedAt: (data.modifiedAt instanceof Timestamp) 
+          ? data.modifiedAt.toDate().toISOString() 
+          : data.modifiedAt
+      };
+    } catch (error) {
+      console.error(`Error getting note for month ${monthYear}:`, error);
+      return null;
+    }
+  }
+
+  async saveNote(note: Note): Promise<Note> {
+    try {
+      const notesQuery = query(
+        collection(firestore, NOTES_COLLECTION),
+        where('monthYear', '==', note.monthYear)
+      );
+      
+      const snapshot = await getDocs(notesQuery);
+      
+      if (snapshot.empty) {
+        // Create new note
+        const docRef = await addDoc(collection(firestore, NOTES_COLLECTION), {
+          monthYear: note.monthYear,
+          content: note.content,
+          lastModifiedBy: note.lastModifiedBy,
+          createdAt: serverTimestamp(),
+          modifiedAt: serverTimestamp()
+        });
+        
+        // Get the created note to return
+        const newNoteDoc = await getDoc(docRef);
+        const newNoteData = newNoteDoc.data();
+        
+        return {
+          monthYear: note.monthYear,
+          content: note.content,
+          lastModifiedBy: note.lastModifiedBy,
+          createdAt: newNoteData?.createdAt.toDate().toISOString() || new Date().toISOString(),
+          modifiedAt: newNoteData?.modifiedAt.toDate().toISOString() || new Date().toISOString()
+        };
+      } else {
+        // Update existing note
+        const docRef = snapshot.docs[0].ref;
+        await updateDoc(docRef, {
+          content: note.content,
+          lastModifiedBy: note.lastModifiedBy,
+          modifiedAt: serverTimestamp()
+        });
+        
+        return {
+          ...note,
+          modifiedAt: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      console.error(`Error saving note for month ${note.monthYear}:`, error);
+      // Return the original note if error occurs
+      return note;
+    }
+  }
+
+  // Comments methods
+  async getCommentsForMonth(monthYear: string): Promise<Comment[]> {
+    try {
+      const commentsQuery = query(
+        collection(firestore, COMMENTS_COLLECTION),
+        where('monthYear', '==', monthYear)
+      );
+      
+      const snapshot = await getDocs(commentsQuery);
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          monthYear: data.monthYear,
+          userId: data.userId,
+          userName: data.userName,
+          content: data.content,
+          createdAt: (data.createdAt instanceof Timestamp) 
+            ? data.createdAt.toDate().toISOString() 
+            : data.createdAt
+        };
+      });
+    } catch (error) {
+      console.error(`Error getting comments for month ${monthYear}:`, error);
+      return [];
+    }
+  }
+
+  async addComment(comment: Comment): Promise<boolean> {
+    try {
+      await addDoc(collection(firestore, COMMENTS_COLLECTION), {
+        monthYear: comment.monthYear,
+        userId: comment.userId,
+        userName: comment.userName,
+        content: comment.content,
+        createdAt: serverTimestamp()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      return false;
+    }
+  }
+
+  async deleteComment(commentId: string): Promise<boolean> {
+    try {
+      const docRef = doc(firestore, COMMENTS_COLLECTION, commentId);
+      await deleteDoc(docRef);
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting comment with ID ${commentId}:`, error);
       return false;
     }
   }

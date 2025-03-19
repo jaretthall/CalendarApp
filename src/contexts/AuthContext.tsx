@@ -26,10 +26,6 @@ const ADMIN_EMAIL = 'admin@clinicamedicos.org';
 const ADMIN_USERNAME = 'Admin';
 const ADMIN_PASSWORD = 'FamMed25!';
 
-// Read-only credentials for regular users
-const READ_ONLY_EMAIL = 'readonly@example.com';
-const READ_ONLY_PASSWORD = 'readonly';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Initialize with read-only mode as true by default
   const [isReadOnly, setIsReadOnly] = useState<boolean>(true);

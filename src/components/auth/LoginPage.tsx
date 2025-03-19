@@ -62,21 +62,6 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleReadOnlyAccess = async () => {
-    try {
-      const success = await login(username || 'Guest', '');
-      
-      if (success) {
-        navigate(from, { replace: true });
-      } else {
-        setError('Failed to access read-only mode');
-      }
-    } catch (error) {
-      setError('An error occurred');
-      console.error('Read-only access error:', error);
-    }
-  };
-
   return (
     <Box
       sx={{

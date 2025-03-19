@@ -80,6 +80,33 @@ CREATE TABLE Users (
     ModifiedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE()
 );
 
+-- Add new tables for calendar notes and comments
+
+-- CalendarNotes table
+CREATE TABLE CalendarNotes (
+    NoteID INT PRIMARY KEY IDENTITY(1,1),
+    MonthYear NVARCHAR(7) NOT NULL, -- Format: YYYY-MM
+    Content NVARCHAR(MAX),
+    LastModifiedBy INT, -- Reference to UserID
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    ModifiedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_Notes_Users FOREIGN KEY (LastModifiedBy) REFERENCES Users(UserID)
+);
+
+-- CalendarComments table
+CREATE TABLE CalendarComments (
+    CommentID INT PRIMARY KEY IDENTITY(1,1),
+    MonthYear NVARCHAR(7) NOT NULL, -- Format: YYYY-MM
+    UserID INT NOT NULL,
+    Content NVARCHAR(MAX) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT FK_Comments_Users FOREIGN KEY (UserID) REFERENCES Users(UserID)
+);
+
+-- Create indexes for performance
+CREATE INDEX IX_CalendarNotes_MonthYear ON CalendarNotes(MonthYear);
+CREATE INDEX IX_CalendarComments_MonthYear ON CalendarComments(MonthYear);
+
 -- Insert sample data
 INSERT INTO ClinicTypes (Name, Color) VALUES 
 ('Main Clinic', '#2196f3'),

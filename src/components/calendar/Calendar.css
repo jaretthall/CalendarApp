@@ -1,0 +1,84 @@
+.calendar-container {
+  overflow-x: auto;
+}
+
+.calendar-grid {
+  min-width: 700px;
+}
+
+.calendar-day-header {
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f5f5f5;
+}
+
+.calendar-day {
+  height: 100px;
+  border: 1px solid #e0e0e0;
+  padding: 4px;
+  overflow: hidden;
+  position: relative;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background-color: #f5f5f5;
+}
+
+.calendar-day.today {
+  background-color: #e3f2fd;
+}
+
+.calendar-day.other-month {
+  background-color: #f9f9f9;
+  color: #bdbdbd;
+}
+
+.calendar-day-number {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.shift-badge {
+  padding: 2px 4px;
+  margin: 2px 0;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+  color: white;
+}
+
+.vacation-indicator {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+@media (max-width: 960px) {
+  .calendar-day {
+    height: 80px;
+  }
+  
+  .shift-badge {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .calendar-day {
+    height: 60px;
+  }
+  
+  .shift-badge {
+    padding: 1px 2px;
+    margin: 1px 0;
+  }
+} 

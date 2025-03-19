@@ -15,6 +15,7 @@ import { ProviderProvider } from './contexts/EmployeeContext';
 import { ClinicTypeProvider } from './contexts/LocationContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { SyncProvider } from './contexts/SyncContext';
+import { NoteProvider } from './contexts/NoteContext';
 import { migrateLocalStorageToFirestore, populateFirestoreWithSampleData } from './utils/dataMigration';
 import ClinicTypeForm from './components/clinics/ClinicTypeForm';
 import firestoreService from './services/FirestoreService';
@@ -95,71 +96,73 @@ const App: React.FC = () => {
         <ProviderProvider>
           <ClinicTypeProvider>
             <ShiftProvider>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                
-                {/* Public route for MonthView */}
-                <Route
-                  path="/"
-                  element={
-                    <Box className="app-container">
-                      <Header toggleDrawer={toggleDrawer} />
-                      <Box sx={{ display: 'flex' }}>
-                        <Sidebar open={drawerOpen} onClose={toggleDrawer} />
-                        <Box component="main" className="content-container">
-                          <MonthView />
-                          <ShiftModal />
-                        </Box>
-                      </Box>
-                    </Box>
-                  }
-                />
-                
-                {/* Settings page - accessible to all but with some features restricted */}
-                <Route
-                  path="/settings"
-                  element={
-                    <Box className="app-container">
-                      <Header toggleDrawer={toggleDrawer} />
-                      <Box sx={{ display: 'flex' }}>
-                        <Sidebar open={drawerOpen} onClose={toggleDrawer} />
-                        <Box component="main" className="content-container">
-                          <SettingsPage />
-                        </Box>
-                      </Box>
-                    </Box>
-                  }
-                />
-                
-                {/* Protected routes */}
-                <Route element={<ProtectedRoute />}>
+              <NoteProvider>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  
+                  {/* Public route for MonthView */}
                   <Route
-                    path="/*"
+                    path="/"
                     element={
                       <Box className="app-container">
                         <Header toggleDrawer={toggleDrawer} />
                         <Box sx={{ display: 'flex' }}>
                           <Sidebar open={drawerOpen} onClose={toggleDrawer} />
                           <Box component="main" className="content-container">
-                            <Routes>
-                              <Route path="/three-month" element={<ThreeMonthView />} />
-                              
-                              {/* Admin-only routes */}
-                              <Route element={<ProtectedRoute requireAdmin={true} />}>
-                                <Route path="/providers/add" element={<ProviderForm />} />
-                                <Route path="/providers/edit/:id" element={<ProviderForm />} />
-                                <Route path="/clinics/add" element={<ClinicTypeForm />} />
-                                <Route path="/clinics/edit/:id" element={<ClinicTypeForm />} />
-                              </Route>
-                            </Routes>
+                            <MonthView />
                             <ShiftModal />
                           </Box>
                         </Box>
                       </Box>
                     }
                   />
-                </Route>
-              </Routes>
+                  
+                  {/* Settings page - accessible to all but with some features restricted */}
+                  <Route
+                    path="/settings"
+                    element={
+                      <Box className="app-container">
+                        <Header toggleDrawer={toggleDrawer} />
+                        <Box sx={{ display: 'flex' }}>
+                          <Sidebar open={drawerOpen} onClose={toggleDrawer} />
+                          <Box component="main" className="content-container">
+                            <SettingsPage />
+                          </Box>
+                        </Box>
+                      </Box>
+                    }
+                  />
+                  
+                  {/* Protected routes */}
+                  <Route element={<ProtectedRoute />}>
+                    <Route
+                      path="/*"
+                      element={
+                        <Box className="app-container">
+                          <Header toggleDrawer={toggleDrawer} />
+                          <Box sx={{ display: 'flex' }}>
+                            <Sidebar open={drawerOpen} onClose={toggleDrawer} />
+                            <Box component="main" className="content-container">
+                              <Routes>
+                                <Route path="/three-month" element={<ThreeMonthView />} />
+                                
+                                {/* Admin-only routes */}
+                                <Route element={<ProtectedRoute requireAdmin={true} />}>
+                                  <Route path="/providers/add" element={<ProviderForm />} />
+                                  <Route path="/providers/edit/:id" element={<ProviderForm />} />
+                                  <Route path="/clinics/add" element={<ClinicTypeForm />} />
+                                  <Route path="/clinics/edit/:id" element={<ClinicTypeForm />} />
+                                </Route>
+                              </Routes>
+                              <ShiftModal />
+                            </Box>
+                          </Box>
+                        </Box>
+                      }
+                    />
+                  </Route>
+                </Routes>
+              </NoteProvider>
             </ShiftProvider>
           </ClinicTypeProvider>
         </ProviderProvider>

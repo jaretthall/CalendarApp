@@ -24,12 +24,16 @@ import {
   isSameMonth,
   addMonths,
   subMonths,
-  isToday
+  isToday,
+  parseISO,
+  isWithinInterval
 } from 'date-fns';
 import { useShifts } from '../../contexts/ShiftContext';
 import { useClinicTypes } from '../../contexts/LocationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProviders } from '../../contexts/EmployeeContext';
+import NotesSection from './NotesSection';
+import './Calendar.css';
 
 const MonthView: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -347,6 +351,9 @@ const MonthView: React.FC = () => {
           </Paper>
         )}
       </Box>
+      
+      {/* Notes Section */}
+      <NotesSection date={currentDate} />
     </Box>
   );
 };
