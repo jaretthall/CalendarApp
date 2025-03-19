@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (email: string, password: string) => Promise<boolean>;
+  setReadOnlyMode: (enabled: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,7 +41,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      setIsAuthenticated(!!user);
+      
+      // Only set authenticated if not in read-only mode
+      if (user && !isReadOnly) {
+        setIsAuthenticated(true);
+      } else if (!user) {
+        setIsAuthenticated(false);
+      }
       
       // Check if user is admin by email
       if (user && user.email) {
@@ -60,15 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Auth state changed: Not logged in or no email');
       }
       
-      // Set read-only status
-      setIsReadOnly(user?.email === READ_ONLY_EMAIL);
-      
       setLoading(false);
     });
     
     // Clean up subscription
     return () => unsubscribe();
-  }, []);
+  }, [isReadOnly]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -83,10 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
       
-      // For read-only access with empty password, use the read-only account
+      // For read-only access with empty password, use read-only mode without actual authentication
       if (email.trim() !== '' && password === '') {
-        console.log('Attempting read-only login with blank password');
-        await signInWithEmailAndPassword(auth, READ_ONLY_EMAIL, READ_ONLY_PASSWORD);
+        console.log('Entering read-only mode (no Firebase authentication)');
+        setReadOnlyMode(true);
         return true;
       }
       
@@ -102,6 +106,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async (): Promise<void> => {
     try {
+      // If in read-only mode, just disable it
+      if (isReadOnly) {
+        setReadOnlyMode(false);
+        return;
+      }
+      
+      // Otherwise do a normal signout
       await signOut(auth);
     } catch (error) {
       console.error('Logout error:', error);
@@ -116,6 +127,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Registration error:', error);
       return false;
     }
+  };
+  
+  // Function to enable/disable read-only mode
+  const setReadOnlyMode = (enabled: boolean) => {
+    setIsReadOnly(enabled);
+    setIsAuthenticated(enabled); // In read-only mode, we're authenticated but with limited permissions
+    setIsAdmin(false); // Read-only users are never admins
   };
 
   if (loading) {
@@ -132,7 +150,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         login,
         logout,
-        register
+        register,
+        setReadOnlyMode
       }}
     >
       {children}

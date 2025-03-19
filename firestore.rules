@@ -1,40 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Check if user is read-only user
-    function isReadOnlyUser() {
-      return request.auth != null && request.auth.token.email == 'readonly@example.com';
-    }
-    
-    // Check if user is authenticated (but not read-only)
+    // Check if user is authenticated 
     function isAuthenticatedUser() {
-      return request.auth != null && request.auth.token.email != 'readonly@example.com';
+      return request.auth != null;
     }
     
-    // Only allow authenticated users to read/write
+    // Only allow authenticated users to write, but anyone can read
     match /{document=**} {
-      allow read: if request.auth != null;
+      allow read: if true;  // Allow all users to read data
       allow write: if isAuthenticatedUser();
     }
     
     // More specific rules for different collections
     match /providers/{document} {
-      allow read: if request.auth != null;
+      allow read: if true;  // Allow all users to read data
       allow write: if isAuthenticatedUser();
     }
     
     match /shifts/{document} {
-      allow read: if request.auth != null;
+      allow read: if true;  // Allow all users to read data
       allow write: if isAuthenticatedUser();
     }
     
     match /clinicTypes/{document} {
-      allow read: if request.auth != null;
+      allow read: if true;  // Allow all users to read data
       allow write: if isAuthenticatedUser();
     }
     
     match /syncLogs/{document} {
-      allow read: if request.auth != null;
+      allow read: if true;  // Allow all users to read data
       allow write: if isAuthenticatedUser();
     }
   }
