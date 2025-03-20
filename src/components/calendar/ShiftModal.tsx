@@ -54,8 +54,7 @@ const ShiftModal: React.FC = () => {
     closeModal, 
     addShift, 
     updateShift, 
-    deleteShift, 
-    forceRefreshShifts 
+    deleteShift
   } = useShifts();
   const { getActiveProviders } = useProviders();
   const { getActiveClinicTypes } = useClinicTypes();

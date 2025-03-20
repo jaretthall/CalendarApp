@@ -48,7 +48,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
   const [lastFetchedDate, setLastFetchedDate] = useState<string>('');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
   // Memoize fetch functions to prevent recreation on each render
   const memoizedFetchNote = useCallback(async (date: Date) => {
@@ -101,7 +100,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
     console.log('Note content updated');
     setNoteContent(content);
     // Auto-save feature could be added here if desired
-    setHasUnsavedChanges(true);
   };
 
   const handleSaveNote = async () => {
@@ -123,7 +121,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
       if (result) {
         setSuccess('Notes saved successfully');
         setIsEditingNote(false);
-        setHasUnsavedChanges(false);
         console.log('Note saved successfully');
       } else {
         setError('Failed to save notes. Please try again.');
