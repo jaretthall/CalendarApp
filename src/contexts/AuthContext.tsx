@@ -110,18 +110,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async (): Promise<void> => {
     try {
-      // If already in read-only mode, nothing to do
-      if (isReadOnly) {
-        return;
-      }
+      console.log('Logout attempt - Current read-only state:', isReadOnly);
       
-      // Otherwise do a normal signout and go back to read-only mode
+      // Always sign out from Firebase first
       await signOut(auth);
-      setReadOnlyMode(true);
+      
+      // Then update local state
+      setCurrentUser(null);
+      setIsAuthenticated(true); // Set to true because we're going to read-only mode
+      setIsAdmin(false);
+      setIsReadOnly(true);
+      
+      console.log('Logout successful - Switched to read-only mode');
     } catch (error) {
       console.error('Logout error:', error);
       // In case of error, still try to go back to read-only mode
-      setReadOnlyMode(true);
+      setCurrentUser(null);
+      setIsAuthenticated(true);
+      setIsAdmin(false);
+      setIsReadOnly(true);
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Paper, 
@@ -49,6 +49,25 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [lastFetchedDate, setLastFetchedDate] = useState<string>('');
 
+  // Memoize fetch functions to prevent recreation on each render
+  const memoizedFetchNote = useCallback(async (date: Date) => {
+    try {
+      await fetchNote(date);
+    } catch (error) {
+      console.error('NotesSection - Error fetching note:', error);
+      setError('Failed to load notes');
+    }
+  }, [fetchNote]);
+  
+  const memoizedFetchComments = useCallback(async (date: Date) => {
+    try {
+      await fetchComments(date);
+    } catch (error) {
+      console.error('NotesSection - Error fetching comments:', error);
+      setError('Failed to load comments');
+    }
+  }, [fetchComments]);
+
   useEffect(() => {
     // Only fetch when the month/year changes to prevent infinite loops
     const currentDateFormat = format(date, 'yyyy-MM');
@@ -59,19 +78,11 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
       
       setLastFetchedDate(currentDateFormat);
       
-      const fetchData = async () => {
-        try {
-          await fetchNote(date);
-          await fetchComments(date);
-        } catch (error) {
-          console.error('NotesSection - Error fetching data:', error);
-          setError('Failed to load notes and comments');
-        }
-      };
-      
-      fetchData();
+      // Separate the data fetching operations
+      memoizedFetchNote(date);
+      memoizedFetchComments(date);
     }
-  }, [date, fetchNote, fetchComments, lastFetchedDate]);
+  }, [date, lastFetchedDate, memoizedFetchNote, memoizedFetchComments]);
 
   useEffect(() => {
     // Update local state when note is loaded from context
