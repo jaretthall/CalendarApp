@@ -50,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { exportShifts, importShifts } = useShifts();
-  const { isAdmin, isAuthenticated, logout } = useAuth();
+  const { isAdmin, isAuthenticated, logout, isReadOnly } = useAuth();
   const [viewAnchorEl, setViewAnchorEl] = useState<null | HTMLElement>(null);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
   const [userAnchorEl, setUserAnchorEl] = useState<null | HTMLElement>(null);
@@ -384,9 +384,16 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
             onClose={handleUserMenuClose}
           >
             {isAuthenticated ? (
-              <MenuItem onClick={handleLogout}>
-                <ExitToApp sx={{ mr: 1 }} /> Logout
-              </MenuItem>
+              <>
+                {isReadOnly && (
+                  <MenuItem onClick={handleLogin}>
+                    <Login sx={{ mr: 1 }} /> Login
+                  </MenuItem>
+                )}
+                <MenuItem onClick={handleLogout}>
+                  <ExitToApp sx={{ mr: 1 }} /> Logout
+                </MenuItem>
+              </>
             ) : (
               <MenuItem onClick={handleLogin}>
                 <Login sx={{ mr: 1 }} /> Login
