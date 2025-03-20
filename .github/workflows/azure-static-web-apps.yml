@@ -29,6 +29,7 @@ jobs:
           output_location: "build" # Built app content directory - e.g. build
           app_build_command: "npm run build"
         env:
+          CI: false
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI }}
