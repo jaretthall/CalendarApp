@@ -509,7 +509,7 @@ const ShiftModal: React.FC = () => {
                   value={formData.startDate && formData.startDate.trim() ? parseISO(formData.startDate) : null}
                   onChange={(newValue) => handleDateChange('startDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
-                  disabled={!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries)}
+                  disabled={Boolean(!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
                 />
               </Grid>
               
@@ -519,7 +519,7 @@ const ShiftModal: React.FC = () => {
                   value={formData.endDate && formData.endDate.trim() ? parseISO(formData.endDate) : null}
                   onChange={(newValue) => handleDateChange('endDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
-                  disabled={!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries)}
+                  disabled={Boolean(!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
                 />
               </Grid>
               
@@ -604,7 +604,7 @@ const ShiftModal: React.FC = () => {
                         value={formData.recurrenceEndDate && formData.recurrenceEndDate.trim() ? parseISO(formData.recurrenceEndDate) : null}
                         onChange={(newValue) => handleDateChange('recurrenceEndDate', newValue)}
                         slotProps={{ textField: { fullWidth: true } }}
-                        disabled={!isAuthenticated || !formData.isRecurring}
+                        disabled={Boolean(!isAuthenticated || !formData.isRecurring)}
                       />
                     </Grid>
                   </Grid>
@@ -690,9 +690,9 @@ const ShiftModal: React.FC = () => {
                           label="Select Date to Delete"
                           value={specificDeleteDate ? (specificDeleteDate.trim() ? parseISO(specificDeleteDate) : null) : null}
                           onChange={handleSpecificDeleteDateChange}
-                          minDate={modalState.shift?.startDate ? parseISO(modalState.shift.startDate) : null}
-                          maxDate={modalState.shift?.endDate ? parseISO(modalState.shift.endDate) : null}
-                          disabled={deleteOption !== 'specific-day'}
+                          minDate={modalState.shift?.startDate ? parseISO(modalState.shift.startDate) : undefined}
+                          maxDate={modalState.shift?.endDate ? parseISO(modalState.shift.endDate) : undefined}
+                          disabled={Boolean(deleteOption !== 'specific-day')}
                         />
                       </Box>
                     </Collapse>

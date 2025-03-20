@@ -26,13 +26,39 @@ export const migrateLocalStorageToFirestore = async (): Promise<boolean> => {
     const shifts = shiftsJson ? JSON.parse(shiftsJson) : [];
     
     // Migrate data to Firestore
-    await firestoreService.migrateData({
-      providers,
-      clinicTypes,
-      shifts
-    });
-    
-    console.log('Data migration completed successfully.');
+    try {
+      // Sanitize provider data to ensure no undefined values for dates
+      const sanitizedProviders = providers.map(provider => ({
+        ...provider,
+        createdAt: provider.createdAt || new Date().toISOString(),
+        updatedAt: provider.updatedAt || new Date().toISOString()
+      }));
+      
+      // Sanitize clinic types data
+      const sanitizedClinicTypes = clinicTypes.map(clinicType => ({
+        ...clinicType,
+        createdAt: clinicType.createdAt || new Date().toISOString(),
+        updatedAt: clinicType.updatedAt || new Date().toISOString()
+      }));
+      
+      // Sanitize shifts data
+      const sanitizedShifts = shifts.map(shift => ({
+        ...shift,
+        createdAt: shift.createdAt || new Date().toISOString(),
+        updatedAt: shift.updatedAt || new Date().toISOString()
+      }));
+      
+      await firestoreService.migrateData({
+        providers: sanitizedProviders,
+        clinicTypes: sanitizedClinicTypes,
+        shifts: sanitizedShifts
+      });
+      
+      console.log('Data migration completed successfully.');
+    } catch (error) {
+      console.error('Error migrating data:', error);
+      throw error;
+    }
     
     // Optionally clear localStorage after successful migration
     // localStorage.removeItem('providers');

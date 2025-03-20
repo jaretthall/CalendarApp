@@ -48,6 +48,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<number>(0);
   const [lastFetchedDate, setLastFetchedDate] = useState<string>('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
   // Memoize fetch functions to prevent recreation on each render
   const memoizedFetchNote = useCallback(async (date: Date) => {
@@ -97,47 +98,78 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
   }, [note]);
 
   const handleNoteChange = (content: string) => {
+    console.log('Note content updated');
     setNoteContent(content);
-    console.log('NotesSection - Note content changed');
+    // Auto-save feature could be added here if desired
+    setHasUnsavedChanges(true);
   };
 
   const handleSaveNote = async () => {
-    setLocalLoading(true);
-    setError(null);
-    setSuccess(null);
-    
     try {
-      const saved = await saveNote(noteContent);
-      if (saved) {
-        setIsEditingNote(false);
-        setSuccess('Note saved successfully');
-      } else {
-        setError('Failed to save note');
+      console.log('Saving note...');
+      setLocalLoading(true);
+      setError('');
+      setSuccess('');
+      
+      // Check authentication
+      if (!isAuthenticated || isReadOnly) {
+        console.error('Cannot save note: User not authenticated or in read-only mode');
+        setError('You need to log in to save notes');
+        return;
       }
-    } catch (err) {
-      setError('An error occurred while saving the note');
-      console.error(err);
+      
+      const result = await saveNote(noteContent);
+      
+      if (result) {
+        setSuccess('Notes saved successfully');
+        setIsEditingNote(false);
+        setHasUnsavedChanges(false);
+        console.log('Note saved successfully');
+      } else {
+        setError('Failed to save notes. Please try again.');
+        console.error('Failed to save notes');
+      }
+    } catch (error) {
+      console.error('NotesSection - Error saving note:', error);
+      setError('An error occurred while saving notes');
     } finally {
       setLocalLoading(false);
     }
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    
-    setLocalLoading(true);
-    setError(null);
-    
     try {
-      const added = await addComment(newComment);
-      if (added) {
-        setNewComment('');
-      } else {
-        setError('Failed to add comment');
+      console.log('Adding comment...');
+      setLocalLoading(true);
+      setError('');
+      setSuccess('');
+      
+      // Check authentication
+      if (!isAuthenticated || isReadOnly) {
+        console.error('Cannot add comment: User not authenticated or in read-only mode');
+        setError('You need to log in to add comments');
+        return;
       }
-    } catch (err) {
-      setError('An error occurred while adding the comment');
-      console.error(err);
+      
+      if (!newComment.trim()) {
+        console.error('Cannot add empty comment');
+        setError('Comment cannot be empty');
+        return;
+      }
+      
+      const result = await addComment(newComment);
+      
+      if (result) {
+        setSuccess('Comment added successfully');
+        setNewComment('');
+        console.log('Comment added successfully');
+      } else {
+        setError('Failed to add comment. Please try again.');
+        console.error('Failed to add comment');
+      }
+    } catch (error) {
+      console.error('NotesSection - Error adding comment:', error);
+      setError('An error occurred while adding comment');
     } finally {
       setLocalLoading(false);
     }
@@ -275,11 +307,19 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
             <Box>
               <RichTextEditor 
                 content={noteContent}
-                onChange={handleNoteChange}
-                readOnly={!isEditingNote}
+                onChange={(content) => {
+                  console.log('Note content changed');
+                  handleNoteChange(content);
+                }}
+                readOnly={!isEditingNote || !isAuthenticated || isReadOnly}
                 placeholder="Add notes for this month..."
                 height={300}
-                toolbarHidden={!isEditingNote}
+                toolbarHidden={!isEditingNote || !isAuthenticated || isReadOnly}
+                onFocus={() => {
+                  console.log('RichTextEditor focused');
+                  // Force a re-render to ensure editor is responsive
+                  setNoteContent(prev => prev);
+                }}
               />
               
               {note && note.modifiedAt && (
@@ -384,19 +424,32 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
                         placeholder="Write a comment..."
                         value={newComment}
                         onChange={(e) => {
-                          console.log('Comment text changed:', e.target.value);
+                          console.log('Comment text changed to:', e.target.value);
                           setNewComment(e.target.value);
                         }}
-                        onFocus={() => console.log('Comment field focused')}
-                        disabled={localLoading}
+                        onFocus={() => {
+                          console.log('Comment field focused');
+                          // Force re-render to ensure field is responsive
+                          setNewComment(prev => prev);
+                        }}
+                        onBlur={() => {
+                          console.log('Comment field blur');
+                        }}
+                        onClick={() => {
+                          console.log('Comment field clicked');
+                          // Force re-render to ensure field is responsive
+                          setNewComment(prev => prev);
+                        }}
+                        disabled={!isAuthenticated || isReadOnly || localLoading}
                         size="small"
                         id="comment-input-field"
+                        sx={{ minHeight: '100px' }}
                       />
                       <Button
                         variant="contained"
                         color="primary"
                         onClick={handleAddComment}
-                        disabled={!newComment.trim() || localLoading}
+                        disabled={!isAuthenticated || isReadOnly || !newComment.trim() || localLoading}
                         startIcon={localLoading ? <CircularProgress size={20} /> : <SendIcon />}
                         sx={{ alignSelf: 'flex-end' }}
                       >

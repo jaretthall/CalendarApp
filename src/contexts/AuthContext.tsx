@@ -75,60 +75,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('Login attempt with:', { email, isReadOnly });
+      
       // Exit read-only mode when attempting to log in
-      setReadOnlyMode(false);
+      // Must set this before attempting Firebase auth
+      setIsReadOnly(false);
       
       // Special case for admin login - allow both email and username
       if ((email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
            email.toLowerCase() === ADMIN_USERNAME.toLowerCase()) && 
           password === ADMIN_PASSWORD) {
-        console.log('Attempting admin login with:', { email, adminEmail: ADMIN_EMAIL, adminUsername: ADMIN_USERNAME });
+        console.log('Admin login detected');
         // Always use the full email for Firebase auth
         const adminEmailToUse = email.includes('@') ? email : `${ADMIN_USERNAME}@clinicamedicos.org`;
         await signInWithEmailAndPassword(auth, adminEmailToUse, ADMIN_PASSWORD);
+        
+        // Force states to correct values
+        setIsAuthenticated(true);
+        setIsAdmin(true);
         return true;
       }
       
       // For read-only access with empty password, switch back to read-only mode
       if (email.trim() !== '' && password === '') {
-        console.log('Returning to read-only mode');
-        setReadOnlyMode(true);
+        console.log('Read-only login detected');
+        setIsReadOnly(true);
+        setIsAuthenticated(true);
+        setIsAdmin(false);
         return true;
       }
       
       // Regular login
-      console.log('Attempting regular login with:', { email });
+      console.log('Regular login attempt');
       await signInWithEmailAndPassword(auth, email, password);
+      setIsAuthenticated(true);
+      setIsAdmin(email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
       return true;
     } catch (error) {
       console.error('Login error:', error);
       // If login fails, go back to read-only mode
-      setReadOnlyMode(true);
+      setIsReadOnly(true);
+      setIsAuthenticated(true);
+      setIsAdmin(false);
       return false;
     }
   };
 
   const logout = async (): Promise<void> => {
     try {
-      console.log('Logout attempt - Current read-only state:', isReadOnly);
+      console.log('Logout attempt - Current state:', { isReadOnly, isAuthenticated, isAdmin });
       
-      // Always sign out from Firebase first
+      // First sign out from Firebase - this will NOT affect our local state until we set it
       await signOut(auth);
       
-      // Then update local state
+      // IMPORTANT: Force our local state to read-only defaults
       setCurrentUser(null);
-      setIsAuthenticated(true); // Set to true because we're going to read-only mode
-      setIsAdmin(false);
       setIsReadOnly(true);
+      setIsAuthenticated(true); // In read-only mode, users are still authenticated for viewing
+      setIsAdmin(false);
       
-      console.log('Logout successful - Switched to read-only mode');
+      console.log('Logout successful - State after logout:', { 
+        isReadOnly: true, 
+        isAuthenticated: true, 
+        isAdmin: false, 
+        currentUser: null 
+      });
     } catch (error) {
       console.error('Logout error:', error);
-      // In case of error, still try to go back to read-only mode
+      // In case of error, still reset all state
       setCurrentUser(null);
+      setIsReadOnly(true);
       setIsAuthenticated(true);
       setIsAdmin(false);
-      setIsReadOnly(true);
     }
   };
 
@@ -148,17 +166,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // Function to enable/disable read-only mode
   const setReadOnlyMode = (enabled: boolean) => {
+    console.log(`Setting read-only mode to ${enabled} with currentUser:`, currentUser);
+    
     setIsReadOnly(enabled);
-    setIsAuthenticated(enabled || (currentUser !== null)); // Authenticated if in read-only mode or if we have a Firebase user
+    
+    // If enabled, we're in read-only mode (always authenticated)
+    // If disabled, we're only authenticated if we have a user
+    setIsAuthenticated(enabled || (currentUser !== null));
+    
     if (enabled) {
-      setIsAdmin(false); // Read-only users are never admins
+      // Read-only users are never admins
+      setIsAdmin(false);
+      console.log('Read-only mode enabled, isAdmin set to false');
     } else if (currentUser?.email) {
       // When exiting read-only mode, recheck admin status based on current user
       const admin = currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || 
                     currentUser.email.toLowerCase() === (ADMIN_USERNAME + '@clinicamedicos.org').toLowerCase();
       setIsAdmin(admin);
+      console.log(`Read-only mode disabled, isAdmin set to ${admin}`);
     }
-    console.log(`Read-only mode ${enabled ? 'enabled' : 'disabled'}`);
   };
 
   if (loading) {
