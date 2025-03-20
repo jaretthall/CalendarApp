@@ -17,7 +17,7 @@ import { useShifts } from '../../contexts/ShiftContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AccountSettings: React.FC = () => {
-  const { isAuthenticated, currentUser } = useAuth();
+  const { isAuthenticated, currentUser, isReadOnly } = useAuth();
   const { shifts, forceRefreshShifts } = useShifts();
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -55,6 +55,12 @@ const AccountSettings: React.FC = () => {
 
   // Function to delete all shifts
   const deleteAllShifts = async () => {
+    // Security check - cannot delete shifts in read-only mode
+    if (isReadOnly) {
+      console.error('Cannot delete shifts in read-only mode');
+      throw new Error('Operation not permitted in read-only mode');
+    }
+    
     // Get the FirestoreService directly
     const databaseService = await import('../../services/DatabaseService').then(module => module.default);
     
@@ -76,9 +82,9 @@ const AccountSettings: React.FC = () => {
         Account Settings
       </Typography>
       
-      {!isAuthenticated ? (
+      {!isAuthenticated || isReadOnly ? (
         <Alert severity="info">
-          Please log in to access account settings.
+          Please log in with full access to manage account settings.
         </Alert>
       ) : (
         <>
@@ -119,7 +125,7 @@ const AccountSettings: React.FC = () => {
                 color="error" 
                 startIcon={<DeleteIcon />}
                 onClick={handleOpenDeleteDialog}
-                disabled={shifts.length === 0}
+                disabled={shifts.length === 0 || isReadOnly}
               >
                 Delete All Shifts
               </Button>

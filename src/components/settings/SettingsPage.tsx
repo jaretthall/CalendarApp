@@ -5,7 +5,8 @@ import {
   Tabs,
   Tab,
   Paper,
-  Container
+  Container,
+  Alert
 } from '@mui/material';
 import SyncSettings from './SyncSettings';
 import ProvidersSettings from './ProvidersSettings';
@@ -49,7 +50,7 @@ const a11yProps = (index: number) => {
 
 const SettingsPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isReadOnly } = useAuth();
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -73,7 +74,7 @@ const SettingsPage: React.FC = () => {
             <Tab icon={<People />} label="Providers" {...a11yProps(1)} />
             <Tab icon={<LocationOn />} label="Clinic Types" {...a11yProps(2)} />
             <Tab icon={<SettingsIcon />} label="Display" {...a11yProps(3)} />
-            <Tab icon={<SettingsIcon />} label="Account" {...a11yProps(4)} disabled={!isAuthenticated} />
+            <Tab icon={<SettingsIcon />} label="Account" {...a11yProps(4)} disabled={!isAuthenticated || isReadOnly} />
           </Tabs>
           
           <TabPanel value={tabValue} index={0}>
@@ -96,7 +97,13 @@ const SettingsPage: React.FC = () => {
           </TabPanel>
           
           <TabPanel value={tabValue} index={4}>
-            <AccountSettings />
+            {isReadOnly ? (
+              <Alert severity="info">
+                Please log in with full access to manage account settings.
+              </Alert>
+            ) : (
+              <AccountSettings />
+            )}
           </TabPanel>
         </Paper>
       </Box>
