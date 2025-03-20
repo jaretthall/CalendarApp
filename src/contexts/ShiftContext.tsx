@@ -58,30 +58,45 @@ interface ShiftContextType {
   closeModal: () => void;
   exportShifts: () => string;
   importShifts: (shiftsData: string) => void;
-  refreshShifts: () => Promise<void>;
-  forceRefreshShifts: () => Promise<void>;
+  refreshShifts: () => Promise<boolean>;
+  forceRefreshShifts: () => Promise<boolean>;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
 
 export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [, setLoading] = useState<boolean>(true);
-
   const [modalState, setModalState] = useState<ShiftModalState>({
     isOpen: false,
     mode: 'add',
     key: uuidv4() // Initialize with a unique key
   });
-
+  const [loading, setLoading] = useState<boolean>(true);
   const { isAuthenticated, isReadOnly } = useAuth();
+
+  // Map database shifts to application format
+  const mapDbShiftToShift = (shift: DatabaseShift): Shift => {
+    // Validate recurrencePattern
+    let validRecurrencePattern: 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined = undefined;
+    if (shift.recurrencePattern) {
+      if (['daily', 'weekly', 'biweekly', 'monthly'].includes(shift.recurrencePattern)) {
+        validRecurrencePattern = shift.recurrencePattern as 'daily' | 'weekly' | 'biweekly' | 'monthly';
+      }
+    }
+    
+    return {
+      ...shift,
+      clinicTypeId: shift.clinicTypeId || '', // Ensure clinicTypeId is never undefined
+      recurrencePattern: validRecurrencePattern
+    };
+  };
 
   // Load shifts from database when component mounts
   useEffect(() => {
     const loadShifts = async () => {
       try {
         setLoading(true);
-        const shiftsData = await databaseService.getShifts();
+        const shiftsData = await databaseService.getAllShifts();
         
         // Map database shifts to application shifts
         const mappedShifts = shiftsData.map(mapDbShiftToShift);
@@ -100,6 +115,54 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     
     loadShifts();
+  }, []);
+
+  // Refresh shifts - load the current shifts from the database
+  const refreshShifts = useCallback(async () => {
+    try {
+      // Get current date and date 12 months from now for initial load
+      const today = new Date();
+      const oneYearLater = addMonths(today, 12);
+      const startDate = format(today, 'yyyy-MM-dd');
+      const endDate = format(oneYearLater, 'yyyy-MM-dd');
+      
+      console.log(`Refreshing shifts from ${startDate} to ${endDate}`);
+      
+      // Get shifts in the date range
+      const shiftsData = await databaseService.getShiftsByDateRange(startDate, endDate);
+      
+      // Extract series IDs to load complete series
+      const seriesIds = new Set<string>();
+      shiftsData.forEach((shift: DatabaseShift) => {
+        if (shift.seriesId) {
+          seriesIds.add(shift.seriesId);
+        }
+      });
+      
+      // Additional collection for shifts outside the date range that are part of a series
+      let additionalSeriesShifts: DatabaseShift[] = [];
+      
+      // For each series ID, ensure we have all shifts in that series
+      for (const seriesId of Array.from(seriesIds)) {
+        const seriesShifts = await databaseService.getShiftsBySeries(seriesId);
+        // Only add shifts that aren't already in the date range result
+        const shiftIdsInDateRange = new Set(shiftsData.map((s: DatabaseShift) => s.id));
+        const newSeriesShifts = seriesShifts.filter((s: DatabaseShift) => !shiftIdsInDateRange.has(s.id));
+        additionalSeriesShifts = [...additionalSeriesShifts, ...newSeriesShifts];
+      }
+      
+      // Combine all shifts
+      const combinedShifts = [...shiftsData, ...additionalSeriesShifts];
+      
+      // Convert database shifts to the expected format
+      const formattedShifts: Shift[] = combinedShifts.map(mapDbShiftToShift);
+      
+      setShifts(formattedShifts);
+      return true;
+    } catch (error) {
+      console.error('Error refreshing shifts:', error);
+      return false;
+    }
   }, []);
   
   // Re-fetch shifts when auth state changes
@@ -716,71 +779,6 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error importing shifts:', error);
     }
   };
-
-  // Helper function to map database shift to application shift
-  const mapDbShiftToShift = (shift: DatabaseShift): Shift => {
-    // Validate recurrencePattern
-    let validRecurrencePattern: 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined = undefined;
-    if (shift.recurrencePattern) {
-      if (['daily', 'weekly', 'biweekly', 'monthly'].includes(shift.recurrencePattern)) {
-        validRecurrencePattern = shift.recurrencePattern as 'daily' | 'weekly' | 'biweekly' | 'monthly';
-      }
-    }
-    
-    return {
-      ...shift,
-      clinicTypeId: shift.clinicTypeId || '', // Ensure clinicTypeId is never undefined
-      recurrencePattern: validRecurrencePattern
-    };
-  };
-
-  // Refresh shifts - load the current shifts from the database
-  const refreshShifts = useCallback(async () => {
-    try {
-      // Get current date and date 12 months from now for initial load
-      const today = new Date();
-      const oneYearLater = addMonths(today, 12);
-      const startDate = format(today, 'yyyy-MM-dd');
-      const endDate = format(oneYearLater, 'yyyy-MM-dd');
-      
-      console.log(`Refreshing shifts from ${startDate} to ${endDate}`);
-      
-      // Get shifts in the date range
-      const shiftsData = await databaseService.getShiftsByDateRange(startDate, endDate);
-      
-      // Extract series IDs to load complete series
-      const seriesIds = new Set<string>();
-      shiftsData.forEach((shift: DatabaseShift) => {
-        if (shift.seriesId) {
-          seriesIds.add(shift.seriesId);
-        }
-      });
-      
-      // Additional collection for shifts outside the date range that are part of a series
-      let additionalSeriesShifts: DatabaseShift[] = [];
-      
-      // For each series ID, ensure we have all shifts in that series
-      for (const seriesId of Array.from(seriesIds)) {
-        const seriesShifts = await databaseService.getShiftsBySeries(seriesId);
-        // Only add shifts that aren't already in the date range result
-        const shiftIdsInDateRange = new Set(shiftsData.map((s: DatabaseShift) => s.id));
-        const newSeriesShifts = seriesShifts.filter((s: DatabaseShift) => !shiftIdsInDateRange.has(s.id));
-        additionalSeriesShifts = [...additionalSeriesShifts, ...newSeriesShifts];
-      }
-      
-      // Combine all shifts
-      const combinedShifts = [...shiftsData, ...additionalSeriesShifts];
-      
-      // Convert database shifts to the expected format
-      const formattedShifts: Shift[] = combinedShifts.map(mapDbShiftToShift);
-      
-      setShifts(formattedShifts);
-      return true;
-    } catch (error) {
-      console.error('Error refreshing shifts:', error);
-      return false;
-    }
-  }, []);
 
   // Force a refresh - this is called when changes are made
   const forceRefreshShifts = useCallback(async () => {

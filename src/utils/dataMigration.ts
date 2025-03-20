@@ -28,21 +28,21 @@ export const migrateLocalStorageToFirestore = async (): Promise<boolean> => {
     // Migrate data to Firestore
     try {
       // Sanitize provider data to ensure no undefined values for dates
-      const sanitizedProviders = providers.map(provider => ({
+      const sanitizedProviders = providers.map((provider: any) => ({
         ...provider,
         createdAt: provider.createdAt || new Date().toISOString(),
         updatedAt: provider.updatedAt || new Date().toISOString()
       }));
       
       // Sanitize clinic types data
-      const sanitizedClinicTypes = clinicTypes.map(clinicType => ({
+      const sanitizedClinicTypes = clinicTypes.map((clinicType: any) => ({
         ...clinicType,
         createdAt: clinicType.createdAt || new Date().toISOString(),
         updatedAt: clinicType.updatedAt || new Date().toISOString()
       }));
       
       // Sanitize shifts data
-      const sanitizedShifts = shifts.map(shift => ({
+      const sanitizedShifts = shifts.map((shift: any) => ({
         ...shift,
         createdAt: shift.createdAt || new Date().toISOString(),
         updatedAt: shift.updatedAt || new Date().toISOString()

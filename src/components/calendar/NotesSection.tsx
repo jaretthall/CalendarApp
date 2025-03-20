@@ -309,17 +309,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
                 content={noteContent}
                 onChange={(content) => {
                   console.log('Note content changed');
+                  // Force a re-render to ensure editor is responsive when focused
+                  if (content === noteContent) {
+                    setNoteContent(prev => prev);
+                  }
                   handleNoteChange(content);
                 }}
                 readOnly={!isEditingNote || !isAuthenticated || isReadOnly}
                 placeholder="Add notes for this month..."
                 height={300}
                 toolbarHidden={!isEditingNote || !isAuthenticated || isReadOnly}
-                onFocus={() => {
-                  console.log('RichTextEditor focused');
-                  // Force a re-render to ensure editor is responsive
-                  setNoteContent(prev => prev);
-                }}
               />
               
               {note && note.modifiedAt && (
