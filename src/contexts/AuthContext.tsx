@@ -134,6 +134,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true); // In read-only mode, users are still authenticated for viewing
       setIsAdmin(false);
       
+      // Notify app of auth state change through a custom event
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+        detail: { 
+          isAuthenticated: true, 
+          isReadOnly: true,
+          isAdmin: false
+        } 
+      }));
+      
       console.log('Logout successful - State after logout:', { 
         isReadOnly: true, 
         isAuthenticated: true, 
@@ -147,6 +156,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsReadOnly(true);
       setIsAuthenticated(true);
       setIsAdmin(false);
+      
+      // Notify app of auth state change through a custom event even in error case
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+        detail: { 
+          isAuthenticated: true, 
+          isReadOnly: true,
+          isAdmin: false
+        } 
+      }));
     }
   };
 

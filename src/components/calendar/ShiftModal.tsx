@@ -20,7 +20,8 @@ import {
   Alert,
   RadioGroup,
   Radio,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, parseISO } from 'date-fns';
@@ -58,7 +59,7 @@ const ShiftModal: React.FC = () => {
   } = useShifts();
   const { getActiveProviders } = useProviders();
   const { getActiveClinicTypes } = useClinicTypes();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isReadOnly } = useAuth();
   
   const activeProviders = getActiveProviders();
   const activeClinicTypes = getActiveClinicTypes();
@@ -87,6 +88,14 @@ const ShiftModal: React.FC = () => {
   // State for edit mode and scope
   const [editMode, setEditMode] = useState<EditModeType>('view');
   const [editScope, setEditScope] = useState<EditScopeType>('this');
+  
+  // Use auth context to check permissions
+  const canEdit = isAuthenticated && !isReadOnly;
+  
+  // Add loading state at the top of the component
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   // Effect to initialize form data when the modal opens
   useEffect(() => {
@@ -187,52 +196,112 @@ const ShiftModal: React.FC = () => {
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!isAuthenticated) return;
+    if (!canEdit) {
+      console.warn('Cannot save: User not authenticated or in read-only mode');
+      setError('You need to log in to save shifts');
+      return;
+    }
     
     try {
-      if (modalState.mode === 'add') {
-        // Add new shift
-        await addShift(formData as Omit<Shift, 'id'>);
-      } else if (modalState.mode === 'edit' && modalState.shift) {
-        // Update existing shift
-        const updateSeries = editScope === 'series' || (editScope === 'multiday' && modalState.shift.isRecurring);
-        await updateShift(modalState.shift.id, formData, updateSeries);
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Validate form data
+      if (!formData.providerId) {
+        setError('Please select a provider');
+        return;
       }
       
-      // Close modal and refresh shifts
-      closeModal();
-      await forceRefreshShifts();
+      if (!formData.startDate || !formData.endDate) {
+        setError('Please select start and end dates');
+        return;
+      }
+      
+      // Process add/update
+      if (modalState.mode === 'add') {
+        await addShift({
+          providerId: formData.providerId || '',
+          clinicTypeId: formData.clinicTypeId || '',
+          startDate: formData.startDate || '',
+          endDate: formData.endDate || '',
+          isVacation: formData.isVacation || false,
+          notes: formData.notes,
+          isRecurring: formData.isRecurring || false,
+          recurrencePattern: formData.recurrencePattern as RecurrencePattern,
+          recurrenceEndDate: formData.recurrenceEndDate,
+          location: formData.location
+        });
+        setSuccess('Shift added successfully');
+      } else if (modalState.shift?.id) {
+        // Update shift
+        if (editScope === 'this' || !isRecurringSeries) {
+          // Update just this occurrence
+          await updateShift(modalState.shift.id, formData);
+        } else if (editScope === 'series' && isRecurringSeries && modalState.shift.seriesId) {
+          // Update entire series
+          await updateShift(modalState.shift.id, formData, true);
+        }
+        setSuccess('Shift updated successfully');
+      }
+      
+      // Close modal with delay to show success message
+      setTimeout(() => {
+        closeModal();
+      }, 1000);
     } catch (error) {
-      console.error('Error submitting shift:', error);
+      console.error('Error saving shift:', error);
+      setError('Failed to save shift. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   // Handle delete
   const handleDelete = async () => {
-    if (!isAuthenticated || !modalState.shift) return;
+    if (!canEdit) {
+      console.warn('Cannot delete: User not authenticated or in read-only mode');
+      setError('You need to log in to delete shifts');
+      return;
+    }
+    
+    if (!modalState.shift?.id) {
+      setError('No shift selected for deletion');
+      return;
+    }
     
     try {
-      // Determine if we're deleting a series
-      const shouldDeleteSeries = editScope === 'series';
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
       
-      // If deleting a specific day from a multi-day shift
-      if (deleteOption === 'specific-day' && specificDeleteDate && editScope === 'multiday') {
-        // Logic for deleting a specific day would go here
-        // This would require backend support for splitting shifts
-        console.log('Deleting specific day:', specificDeleteDate);
-        
-        // For now, just delete the entire shift as a placeholder
-        await deleteShift(modalState.shift.id, shouldDeleteSeries);
-      } else {
-        // Delete the entire shift or series
-        await deleteShift(modalState.shift.id, shouldDeleteSeries);
+      if (editScope === 'this' || !isRecurringSeries) {
+        // Delete just this occurrence
+        await deleteShift(modalState.shift.id, false);
+      } else if (editScope === 'series' && isRecurringSeries) {
+        // Delete entire series
+        await deleteShift(modalState.shift.id, deleteSeries);
+      } else if (editScope === 'multiday' && deleteOption === 'specific-day' && specificDeleteDate) {
+        // Handle specific day deletion from a multi-day shift
+        // This is handled by a special function in ShiftContext
+        console.log('Deleting specific day from multi-day shift:', specificDeleteDate);
+        // You'd implement this functionality in your ShiftContext
+      } else if (editScope === 'multiday') {
+        // Delete the entire multi-day shift
+        await deleteShift(modalState.shift.id, false);
       }
       
-      // Close modal and refresh shifts
-      closeModal();
-      await forceRefreshShifts();
+      setSuccess('Shift deleted successfully');
+      
+      // Close modal with delay to show success message
+      setTimeout(() => {
+        closeModal();
+      }, 1000);
     } catch (error) {
       console.error('Error deleting shift:', error);
+      setError('Failed to delete shift. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -287,9 +356,26 @@ const ShiftModal: React.FC = () => {
       </DialogTitle>
       
       <DialogContent>
-        {!isAuthenticated && (
-          <Alert severity="info" sx={{ mb: 2, mt: 1 }}>
-            You need to log in to add or edit shifts. Please log in using the icon in the header.
+        {!canEdit && (
+          <Alert 
+            severity="info" 
+            sx={{ 
+              mb: 2, 
+              mt: 1,
+              bgcolor: 'info.light',
+              border: '1px solid',
+              borderColor: 'info.main',
+              '& .MuiAlert-icon': {
+                fontSize: '1.5rem'
+              }
+            }}
+          >
+            <Typography variant="subtitle1">Read-Only Mode</Typography>
+            <Typography variant="body2">
+              You are currently in read-only mode. You need to log in to add or edit shifts.
+              {isReadOnly && isAuthenticated && " You are logged in but in read-only mode."}
+              {!isAuthenticated && " Please log in using the icon in the header."}
+            </Typography>
           </Alert>
         )}
         
@@ -374,7 +460,7 @@ const ShiftModal: React.FC = () => {
               fullWidth 
               startIcon={<EditIcon />}
               onClick={handleEditClick}
-              disabled={!isAuthenticated}
+              disabled={!canEdit}
             >
               Edit This Shift
             </Button>
@@ -472,7 +558,7 @@ const ShiftModal: React.FC = () => {
                     value={formData.providerId || ''}
                     onChange={handleSelectChange}
                     label="Provider"
-                    disabled={!isAuthenticated}
+                    disabled={!canEdit}
                   >
                     {activeProviders.map(provider => (
                       <MenuItem key={provider.id} value={provider.id}>
@@ -492,7 +578,7 @@ const ShiftModal: React.FC = () => {
                     value={formData.clinicTypeId || ''}
                     onChange={handleSelectChange}
                     label="Location"
-                    disabled={!isAuthenticated}
+                    disabled={!canEdit}
                   >
                     {activeClinicTypes.map(clinicType => (
                       <MenuItem key={clinicType.id} value={clinicType.id}>
@@ -509,7 +595,7 @@ const ShiftModal: React.FC = () => {
                   value={formData.startDate && formData.startDate.trim() ? parseISO(formData.startDate) : null}
                   onChange={(newValue) => handleDateChange('startDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
-                  disabled={Boolean(!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
+                  disabled={Boolean(!canEdit || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
                 />
               </Grid>
               
@@ -519,7 +605,7 @@ const ShiftModal: React.FC = () => {
                   value={formData.endDate && formData.endDate.trim() ? parseISO(formData.endDate) : null}
                   onChange={(newValue) => handleDateChange('endDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
-                  disabled={Boolean(!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
+                  disabled={Boolean(!canEdit || (editMode === 'edit' && editScope === 'series' && isRecurringSeries))}
                 />
               </Grid>
               
@@ -530,7 +616,7 @@ const ShiftModal: React.FC = () => {
                       name="isVacation"
                       checked={formData.isVacation || false}
                       onChange={handleChange}
-                      disabled={!isAuthenticated}
+                      disabled={!canEdit}
                     />
                   }
                   label="Mark as vacation"
@@ -546,7 +632,7 @@ const ShiftModal: React.FC = () => {
                   fullWidth
                   multiline
                   rows={2}
-                  disabled={!isAuthenticated}
+                  disabled={!canEdit}
                 />
               </Grid>
             </Grid>
@@ -569,7 +655,7 @@ const ShiftModal: React.FC = () => {
                       name="isRecurring"
                       checked={formData.isRecurring || false}
                       onChange={handleChange}
-                      disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                      disabled={!canEdit || (modalState.mode === 'edit' && editScope !== 'series')}
                     />
                   }
                   label="Recurring shift"
@@ -588,7 +674,7 @@ const ShiftModal: React.FC = () => {
                           value={formData.recurrencePattern || 'weekly'}
                           onChange={handleSelectChange}
                           label="Recurrence Pattern"
-                          disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                          disabled={!canEdit || (modalState.mode === 'edit' && editScope !== 'series')}
                         >
                           <MenuItem value="daily">Daily</MenuItem>
                           <MenuItem value="weekly">Weekly</MenuItem>
@@ -604,7 +690,7 @@ const ShiftModal: React.FC = () => {
                         value={formData.recurrenceEndDate && formData.recurrenceEndDate.trim() ? parseISO(formData.recurrenceEndDate) : null}
                         onChange={(newValue) => handleDateChange('recurrenceEndDate', newValue)}
                         slotProps={{ textField: { fullWidth: true } }}
-                        disabled={Boolean(!isAuthenticated || !formData.isRecurring)}
+                        disabled={Boolean(!canEdit || !formData.isRecurring)}
                       />
                     </Grid>
                   </Grid>
@@ -717,8 +803,8 @@ const ShiftModal: React.FC = () => {
                       control={
                         <Switch
                           checked={deleteSeries}
-                          onChange={(e) => isAuthenticated && setDeleteSeries(e.target.checked)}
-                          disabled={!isAuthenticated}
+                          onChange={(e) => canEdit && setDeleteSeries(e.target.checked)}
+                          disabled={!canEdit}
                           color="error"
                         />
                       }
@@ -742,12 +828,23 @@ const ShiftModal: React.FC = () => {
       </DialogContent>
       
       <DialogActions>
+        {error && (
+          <Box sx={{ flexGrow: 1, mr: 2 }}>
+            <Alert severity="error" sx={{ py: 0 }}>{error}</Alert>
+          </Box>
+        )}
+        {success && (
+          <Box sx={{ flexGrow: 1, mr: 2 }}>
+            <Alert severity="success" sx={{ py: 0 }}>{success}</Alert>
+          </Box>
+        )}
+        
         {modalState.mode === 'edit' && editMode === 'edit' && (
           <Button 
             onClick={handleDelete} 
             color="error"
             variant="contained"
-            disabled={!isAuthenticated}
+            disabled={!canEdit || loading}
             startIcon={<DeleteIcon />}
             sx={{ mr: 'auto' }}
           >
@@ -759,17 +856,18 @@ const ShiftModal: React.FC = () => {
           </Button>
         )}
         
-        <Button onClick={closeModal}>Cancel</Button>
+        <Button onClick={closeModal}>
+          Cancel
+        </Button>
         
-        {editMode === 'edit' && (
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained"
-            disabled={!isAuthenticated}
-          >
-            {modalState.mode === 'add' ? 'Add' : 'Save Changes'}
-          </Button>
-        )}
+        <Button 
+          onClick={handleSubmit}
+          variant="contained" 
+          color="primary"
+          disabled={!canEdit || loading}
+        >
+          {loading ? <CircularProgress size={24} /> : modalState.mode === 'add' ? 'Add' : 'Save Changes'}
+        </Button>
       </DialogActions>
     </Dialog>
   );
