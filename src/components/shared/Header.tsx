@@ -39,6 +39,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSync } from '../../contexts/SyncContext';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useSnackbar } from 'notistack';
 
 interface HeaderProps {
   toggleDrawer: () => void;
@@ -56,6 +57,8 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
   
   // Use the real sync context
   const { syncStatus, lastSyncTime, syncNow, pendingChanges } = useSync();
+
+  const { enqueueSnackbar } = useSnackbar();
 
   const handleViewMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setViewAnchorEl(event.currentTarget);
@@ -169,10 +172,22 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
     handleUserMenuClose();
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    handleUserMenuClose();
+  const handleLogout = async () => {
+    try {
+      console.log('Initiating logout');
+      await logout();
+      console.log('Logout successful, navigating home');
+      // Force a navigation to home page
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Show error notification if available
+      if (enqueueSnackbar) {
+        enqueueSnackbar('Logout failed. Please try again.', { variant: 'error' });
+      }
+    } finally {
+      handleUserMenuClose();
+    }
   };
 
   // Get sync icon and color based on status

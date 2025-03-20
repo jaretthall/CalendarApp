@@ -309,8 +309,8 @@ const ShiftModal: React.FC = () => {
                       <Typography variant="body2" color="text.secondary">Date</Typography>
                       <Typography variant="body1">
                         {isMultiDayShift 
-                          ? `${format(parseISO(formData.startDate || ''), 'MMM d, yyyy')} - ${format(parseISO(formData.endDate || ''), 'MMM d, yyyy')}`
-                          : format(parseISO(formData.startDate || ''), 'MMM d, yyyy')}
+                          ? `${formData.startDate ? format(parseISO(formData.startDate), 'MMM d, yyyy') : 'N/A'} - ${formData.endDate ? format(parseISO(formData.endDate), 'MMM d, yyyy') : 'N/A'}`
+                          : formData.startDate ? format(parseISO(formData.startDate), 'MMM d, yyyy') : 'N/A'}
                       </Typography>
                     </Box>
                   </Box>
@@ -334,7 +334,9 @@ const ShiftModal: React.FC = () => {
                         <Typography variant="body2" color="text.secondary">Recurring Pattern</Typography>
                         <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
                           {formData.recurrencePattern} 
-                          {formData.recurrenceEndDate ? ` until ${format(parseISO(formData.recurrenceEndDate), 'MMM d, yyyy')}` : ''}
+                          {formData.recurrenceEndDate && formData.recurrenceEndDate.trim() ? 
+                            ` until ${format(parseISO(formData.recurrenceEndDate), 'MMM d, yyyy')}` : 
+                            ''}
                         </Typography>
                       </Box>
                     </Box>
@@ -403,11 +405,11 @@ const ShiftModal: React.FC = () => {
                     control={<Radio />} 
                     label={
                       <Box>
-                        <Typography variant="body2">
-                          Only this occurrence ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')})
+                        <Typography variant="body1">
+                          Only this occurrence ({modalState.shift?.startDate ? format(parseISO(modalState.shift.startDate), 'MMM d, yyyy') : 'N/A'})
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Changes will only affect this specific day
+                          Changes will only affect this specific shift
                         </Typography>
                       </Box>
                     }
@@ -419,11 +421,11 @@ const ShiftModal: React.FC = () => {
                       control={<Radio />} 
                       label={
                         <Box>
-                          <Typography variant="body2">
-                            This multi-day shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
+                          <Typography variant="body1">
+                            This multi-day shift ({modalState.shift?.startDate ? format(parseISO(modalState.shift.startDate), 'MMM d, yyyy') : 'N/A'} - {modalState.shift?.endDate ? format(parseISO(modalState.shift.endDate), 'MMM d, yyyy') : 'N/A'})
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            Changes will affect all days in this shift span
+                            Changes will affect all days in this multi-day shift
                           </Typography>
                         </Box>
                       }
@@ -504,20 +506,20 @@ const ShiftModal: React.FC = () => {
               <Grid item xs={12} sm={6}>
                 <DatePicker
                   label="Start Date"
-                  value={formData.startDate ? parseISO(formData.startDate) : null}
-                  onChange={(date) => handleDateChange('startDate', date)}
-                  disabled={!isAuthenticated}
+                  value={formData.startDate && formData.startDate.trim() ? parseISO(formData.startDate) : null}
+                  onChange={(newValue) => handleDateChange('startDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
+                  disabled={!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries)}
                 />
               </Grid>
               
               <Grid item xs={12} sm={6}>
                 <DatePicker
                   label="End Date"
-                  value={formData.endDate ? parseISO(formData.endDate) : null}
-                  onChange={(date) => handleDateChange('endDate', date)}
-                  disabled={!isAuthenticated}
+                  value={formData.endDate && formData.endDate.trim() ? parseISO(formData.endDate) : null}
+                  onChange={(newValue) => handleDateChange('endDate', newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
+                  disabled={!isAuthenticated || (editMode === 'edit' && editScope === 'series' && isRecurringSeries)}
                 />
               </Grid>
               
@@ -598,11 +600,11 @@ const ShiftModal: React.FC = () => {
                     
                     <Grid item xs={12} sm={6}>
                       <DatePicker
-                        label="Recurrence End Date"
-                        value={formData.recurrenceEndDate ? parseISO(formData.recurrenceEndDate) : null}
-                        onChange={(date) => handleDateChange('recurrenceEndDate', date)}
-                        disabled={!isAuthenticated || (modalState.mode === 'edit' && editScope !== 'series')}
+                        label="Series End Date"
+                        value={formData.recurrenceEndDate && formData.recurrenceEndDate.trim() ? parseISO(formData.recurrenceEndDate) : null}
+                        onChange={(newValue) => handleDateChange('recurrenceEndDate', newValue)}
                         slotProps={{ textField: { fullWidth: true } }}
+                        disabled={!isAuthenticated || !formData.isRecurring}
                       />
                     </Grid>
                   </Grid>
@@ -657,7 +659,7 @@ const ShiftModal: React.FC = () => {
                           label={
                             <Box>
                               <Typography variant="body2">
-                                Delete entire shift ({format(parseISO(modalState.shift?.startDate || ''), 'MMM d, yyyy')} - {format(parseISO(modalState.shift?.endDate || ''), 'MMM d, yyyy')})
+                                Delete entire shift ({modalState.shift?.startDate ? format(parseISO(modalState.shift.startDate), 'MMM d, yyyy') : 'N/A'} - {modalState.shift?.endDate ? format(parseISO(modalState.shift.endDate), 'MMM d, yyyy') : 'N/A'})
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 Removes the complete shift span
@@ -684,14 +686,13 @@ const ShiftModal: React.FC = () => {
                     
                     <Collapse in={deleteOption === 'specific-day'}>
                       <Box sx={{ mt: 2 }}>
-                        <DatePicker
-                          label="Select day to delete"
-                          value={specificDeleteDate ? parseISO(specificDeleteDate) : null}
+                        <DatePicker 
+                          label="Select Date to Delete"
+                          value={specificDeleteDate ? (specificDeleteDate.trim() ? parseISO(specificDeleteDate) : null) : null}
                           onChange={handleSpecificDeleteDateChange}
-                          disabled={!isAuthenticated}
-                          minDate={parseISO(modalState.shift?.startDate || '')}
-                          maxDate={parseISO(modalState.shift?.endDate || '')}
-                          slotProps={{ textField: { fullWidth: true } }}
+                          minDate={modalState.shift?.startDate ? parseISO(modalState.shift.startDate) : null}
+                          maxDate={modalState.shift?.endDate ? parseISO(modalState.shift.endDate) : null}
+                          disabled={deleteOption !== 'specific-day'}
                         />
                       </Box>
                     </Collapse>

@@ -383,9 +383,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({ date }) => {
                         fullWidth
                         placeholder="Write a comment..."
                         value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
+                        onChange={(e) => {
+                          console.log('Comment text changed:', e.target.value);
+                          setNewComment(e.target.value);
+                        }}
+                        onFocus={() => console.log('Comment field focused')}
                         disabled={localLoading}
                         size="small"
+                        id="comment-input-field"
                       />
                       <Button
                         variant="contained"
