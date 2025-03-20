@@ -17,7 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isReadOnly } = useAuth();
+  const { login, isReadOnly, isAuthenticated } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -28,12 +28,13 @@ const LoginPage: React.FC = () => {
   // Get the redirect path from location state or default to '/'
   const from = location.state?.from?.pathname || '/';
 
-  // Immediately redirect to home if in read-only mode
+  // We WANT to stay on the login page even in read-only mode so users can login
+  // Only redirect if we're already fully authenticated and not in read-only mode
   React.useEffect(() => {
-    if (isReadOnly) {
+    if (isAuthenticated && !isReadOnly) {
       navigate('/', { replace: true });
     }
-  }, [isReadOnly, navigate]);
+  }, [isAuthenticated, isReadOnly, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +95,7 @@ const LoginPage: React.FC = () => {
             Sign in to manage the application
           </Typography>
           <Alert severity="info" sx={{ mt: 2, textAlign: 'left' }}>
-            You are currently in read-only mode. Login to make changes.
+            You are currently in read-only mode. Login to access editing functionality, including adding/editing shifts, providers, and clinics.
           </Alert>
         </Box>
         
