@@ -17,6 +17,7 @@ import {
   processImportedShifts,
   templateData,
 } from "@/utils/importData";
+import ExportImportButtons from './ExportImportButtons';
 
 interface ImportDataDialogProps {
   open: boolean;
@@ -142,6 +143,7 @@ export default function ImportDataDialog({
           <Button onClick={handleImport}>Import Data</Button>
         </DialogFooter>
       </DialogContent>
+      <ExportImportButtons />
     </Dialog>
   );
 }

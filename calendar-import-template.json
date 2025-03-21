@@ -1,0 +1,156 @@
+{
+  "version": "1.0",
+  "exportDate": "2023-07-23T15:30:45.123Z",
+  "providers": [
+    {
+      "id": "provider1",
+      "firstName": "John",
+      "lastName": "Smith",
+      "color": "#4f46e5",
+      "isActive": true,
+      "email": "john.smith@example.com"
+    },
+    {
+      "id": "provider2",
+      "firstName": "Jane",
+      "lastName": "Johnson",
+      "color": "#10b981",
+      "isActive": true,
+      "email": "jane.johnson@example.com"
+    },
+    {
+      "id": "provider3",
+      "firstName": "Sarah",
+      "lastName": "Williams",
+      "color": "#f59e0b",
+      "isActive": true,
+      "email": "sarah.williams@example.com"
+    },
+    {
+      "id": "provider4",
+      "firstName": "Robert",
+      "lastName": "Brown",
+      "color": "#ec4899",
+      "isActive": true,
+      "email": "robert.brown@example.com"
+    },
+    {
+      "id": "provider5",
+      "firstName": "Michael",
+      "lastName": "Davis",
+      "color": "#6366f1",
+      "isActive": false,
+      "email": "michael.davis@example.com"
+    }
+  ],
+  "clinicTypes": [
+    {
+      "id": "clinicType1",
+      "name": "Primary Care",
+      "color": "#3b82f6",
+      "isActive": true
+    },
+    {
+      "id": "clinicType2",
+      "name": "Specialty",
+      "color": "#ec4899",
+      "isActive": true
+    },
+    {
+      "id": "clinicType3",
+      "name": "Urgent Care",
+      "color": "#ef4444",
+      "isActive": true
+    },
+    {
+      "id": "clinicType4",
+      "name": "Pediatrics",
+      "color": "#8b5cf6",
+      "isActive": true
+    },
+    {
+      "id": "clinicType5",
+      "name": "Geriatrics",
+      "color": "#f97316",
+      "isActive": false
+    }
+  ],
+  "shifts": [
+    {
+      "id": "shift1",
+      "providerId": "provider1",
+      "clinicTypeId": "clinicType1",
+      "startDate": "2023-07-21T08:00:00.000Z",
+      "endDate": "2023-07-21T17:00:00.000Z",
+      "isVacation": false,
+      "notes": "Regular shift",
+      "location": "Main Clinic",
+      "isRecurring": false,
+      "seriesId": null,
+      "recurrencePattern": null,
+      "recurrenceEndDate": null
+    },
+    {
+      "id": "shift2",
+      "providerId": "provider2",
+      "clinicTypeId": "clinicType2",
+      "startDate": "2023-07-22T09:00:00.000Z",
+      "endDate": "2023-07-22T18:00:00.000Z",
+      "isVacation": false,
+      "notes": "Specialty clinic",
+      "location": "North Branch",
+      "isRecurring": true,
+      "seriesId": "series1",
+      "recurrencePattern": "weekly",
+      "recurrenceEndDate": "2023-09-30T18:00:00.000Z"
+    },
+    {
+      "id": "shift3",
+      "providerId": "provider3",
+      "clinicTypeId": "clinicType3",
+      "startDate": "2023-07-23T12:00:00.000Z",
+      "endDate": "2023-07-23T22:00:00.000Z",
+      "isVacation": false,
+      "notes": "Urgent care coverage",
+      "location": "Emergency Wing",
+      "isRecurring": false,
+      "seriesId": null,
+      "recurrencePattern": null,
+      "recurrenceEndDate": null
+    },
+    {
+      "id": "shift4",
+      "providerId": "provider4",
+      "clinicTypeId": "clinicType4",
+      "startDate": "2023-07-24T08:00:00.000Z",
+      "endDate": "2023-07-28T17:00:00.000Z",
+      "isVacation": true,
+      "notes": "Summer vacation",
+      "location": null,
+      "isRecurring": false,
+      "seriesId": null,
+      "recurrencePattern": null,
+      "recurrenceEndDate": null
+    }
+  ],
+  "notes": [
+    {
+      "id": "note1",
+      "date": "2023-07-01T00:00:00.000Z",
+      "content": "Monthly staff meeting scheduled for the 15th at 9 AM.",
+      "type": "monthly"
+    },
+    {
+      "id": "note2",
+      "date": "2023-07-15T00:00:00.000Z",
+      "content": "Hospital accreditation inspection on this day. Please ensure all documentation is up to date.",
+      "type": "monthly"
+    },
+    {
+      "id": "note3",
+      "date": "2023-08-01T00:00:00.000Z",
+      "content": "New rotation schedule begins this month.",
+      "type": "monthly"
+    }
+  ]
+} 
