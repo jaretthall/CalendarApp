@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   Container,
   Alert
 } from '@mui/material';
+import { useLocation } from 'react-router-dom';
 import SyncSettings from './SyncSettings';
 import ProvidersSettings from './ProvidersSettings';
 import ClinicsSettings from './ClinicsSettings';
@@ -49,9 +50,40 @@ const a11yProps = (index: number) => {
   };
 };
 
+// Function to get the tab index from the URL
+const getTabFromUrl = (search: string): number => {
+  const params = new URLSearchParams(search);
+  const tabParam = params.get('tab');
+  
+  // Map the tab name to index
+  switch (tabParam) {
+    case 'sync':
+      return 0;
+    case 'providers':
+      return 1;
+    case 'clinics':
+      return 2;
+    case 'display':
+      return 3;
+    case 'reports':
+      return 4;
+    case 'account':
+      return 5;
+    default:
+      return 0;
+  }
+};
+
 const SettingsPage: React.FC = () => {
-  const [tabValue, setTabValue] = useState(0);
+  const location = useLocation();
+  const initialTab = getTabFromUrl(location.search);
+  const [tabValue, setTabValue] = useState(initialTab);
   const { isAuthenticated, isReadOnly } = useAuth();
+  
+  // Update the tab when the URL changes
+  useEffect(() => {
+    setTabValue(getTabFromUrl(location.search));
+  }, [location.search]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);

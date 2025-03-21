@@ -14,24 +14,28 @@ import {
   useTheme,
   Badge,
   Chip,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  CalendarViewMonth,
-  ViewWeek,
+  AccountCircle,
   Today,
+  SettingsOutlined as SettingsIcon,
+  ViewDay,
+  ViewWeek,
+  Login,
   CloudDownload,
   CloudUpload,
-  PictureAsPdf,
-  ExitToApp,
-  Login,
-  AccountCircle,
-  Settings as SettingsIcon,
-  CloudDone,
   CloudOff,
   CloudSync,
-  CloudQueue
+  CloudQueue,
+  Sync as SyncIcon,
+  CheckCircle,
+  Warning,
+  Error as ErrorIcon,
+  PictureAsPdf,
+  Logout
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { useShifts } from '../../contexts/ShiftContext';
@@ -194,11 +198,11 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
   const getSyncStatusIcon = () => {
     switch (syncStatus) {
       case 'synced':
-        return <CloudDone color="success" />;
+        return <CheckCircle color="success" />;
       case 'syncing':
-        return <CloudSync color="primary" />;
+        return <SyncIcon color="primary" />;
       case 'error':
-        return <CloudOff color="error" />;
+        return <ErrorIcon color="error" />;
       case 'offline':
         return <CloudQueue color="disabled" />;
       default:
@@ -224,6 +228,12 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
       default:
         return timeString;
     }
+  };
+
+  // Add this function to navigate to reports tab
+  const handleReportsClick = () => {
+    navigate('/settings?tab=reports');
+    handleExportMenuClose();
   };
 
   return (
@@ -263,7 +273,7 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
             <Button 
               color="inherit"
               onClick={handleViewMenuOpen}
-              startIcon={<CalendarViewMonth />}
+              startIcon={<ViewWeek />}
               sx={{ mr: 1 }}
             >
               {!isMobile && "View"}
@@ -279,14 +289,14 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
               to="/"
               onClick={handleViewMenuClose}
             >
-              <CalendarViewMonth sx={{ mr: 1 }} /> Month View
+              <ViewDay /> Month View
             </MenuItem>
             <MenuItem 
               component={Link} 
               to="/three-month"
               onClick={handleViewMenuClose}
             >
-              <ViewWeek sx={{ mr: 1 }} /> Three Month View
+              <ViewWeek /> Three Month View
             </MenuItem>
           </Menu>
           
@@ -313,6 +323,9 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
           >
             <MenuItem onClick={handleExportPDF}>
               <PictureAsPdf sx={{ mr: 1 }} /> Export Calendar as PDF
+            </MenuItem>
+            <MenuItem onClick={handleReportsClick}>
+              <PictureAsPdf sx={{ mr: 1 }} /> Shift Patterns Report
             </MenuItem>
             {isAdmin && (
               <>
@@ -391,7 +404,7 @@ const Header: React.FC<HeaderProps> = ({ toggleDrawer }) => {
                   </MenuItem>
                 )}
                 <MenuItem onClick={handleLogout}>
-                  <ExitToApp sx={{ mr: 1 }} /> Logout
+                  <Logout sx={{ mr: 1 }} /> Logout
                 </MenuItem>
               </>
             ) : (

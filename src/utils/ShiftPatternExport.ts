@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+// Import autotable with proper type declaration
+import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
 
 // Interfaces that match the database models
@@ -29,6 +30,13 @@ interface Shift {
   location?: string;
 }
 
+// Add the missing types for jsPDF-autotable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
+
 /**
  * Utility class for generating shift pattern exports
  */
@@ -38,6 +46,16 @@ export class ShiftPatternExport {
   private shifts: Shift[];
 
   constructor(providers: Provider[], clinicTypes: ClinicType[], shifts: Shift[]) {
+    if (!Array.isArray(providers)) {
+      throw new Error('Providers must be an array');
+    }
+    if (!Array.isArray(clinicTypes)) {
+      throw new Error('Clinic types must be an array');
+    }
+    if (!Array.isArray(shifts)) {
+      throw new Error('Shifts must be an array');
+    }
+    
     this.providers = providers;
     this.clinicTypes = clinicTypes;
     this.shifts = shifts;
@@ -48,198 +66,234 @@ export class ShiftPatternExport {
    * @returns Promise that resolves when PDF is generated
    */
   public async generatePdf(): Promise<void> {
-    // Create new PDF document
-    const doc = new jsPDF();
-    
-    // Set up document properties
-    doc.setProperties({
-      title: 'Provider Shift Patterns Report',
-      subject: 'Shift scheduling patterns by provider',
-      author: 'Calendar Application',
-      creator: 'Shift Pattern Report Generator'
-    });
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text('Provider Shift Patterns Report', 14, 20);
-    doc.setFontSize(11);
-    doc.text(`Generated on ${format(new Date(), 'MMM d, yyyy h:mm a')}`, 14, 28);
-    
-    // Group shifts by provider and series
-    const providerMap = this.groupShiftsBySeries();
-    
-    let yPosition = 40;
-    const pageHeight = doc.internal.pageSize.height;
-    
-    // Iterate through each provider
-    Array.from(providerMap.entries()).forEach(([providerId, data]) => {
-      const { provider, recurringShiftSeries, oneTimeShifts } = data;
+    try {
+      // Create new PDF document
+      const doc = new jsPDF();
       
-      // Check if we need a new page
-      if (yPosition > pageHeight - 40) {
-        doc.addPage();
-        yPosition = 20;
+      // Ensure autoTable is available on the jsPDF instance
+      if (typeof autoTable !== 'undefined') {
+        // @ts-ignore - Applying autoTable to the jsPDF prototype
+        jsPDF.API.autoTable = autoTable;
       }
       
-      // Provider header
-      doc.setFontSize(14);
-      doc.setTextColor(0, 0, 128);
-      doc.text(`${provider.firstName} ${provider.lastName}`, 14, yPosition);
-      yPosition += 8;
-      
-      // If provider has no shifts, note that
-      if (recurringShiftSeries.length === 0 && oneTimeShifts.length === 0) {
-        doc.setFontSize(11);
-        doc.setTextColor(100, 100, 100);
-        doc.text('No shifts scheduled', 14, yPosition);
-        yPosition += 15;
-        return;
+      // Check that autoTable is applied to doc
+      if (!doc.autoTable) {
+        throw new Error('autoTable is not available on jsPDF instance');
       }
       
-      // Display recurring shift patterns
-      if (recurringShiftSeries.length > 0) {
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text('Recurring Shift Patterns:', 14, yPosition);
-        yPosition += 7;
-        
-        // Table for recurring shifts with enhanced description
-        const recurringTableData = recurringShiftSeries.map((series: {
-          clinicTypeId?: string;
-          [key: string]: any;
-        }) => {
-          const clinicName = this.getClinicTypeName(series.clinicTypeId);
-          const patternDescription = this.formatShiftPatternDescription(series);
-          
-          return [
-            patternDescription,
-            clinicName,
-            series.location || 'N/A',
-            series.notes || ''
-          ];
-        });
-        
-        // Add recurring shifts table with updated columns
-        doc.autoTable({
-          startY: yPosition,
-          head: [['Shift Pattern', 'Clinic', 'Location', 'Notes']],
-          body: recurringTableData,
-          theme: 'striped',
-          headStyles: { fillColor: [66, 133, 244], textColor: 255 },
-          margin: { left: 14, right: 14 },
-          styles: { overflow: 'linebreak', cellWidth: 'auto' },
-          columnStyles: {
-            0: { cellWidth: 90 },
-            1: { cellWidth: 30 },
-            2: { cellWidth: 30 },
-            3: { cellWidth: 40 }
-          }
-        });
-        
-        yPosition = (doc as any).lastAutoTable.finalY + 10;
-      }
+      // Set up document properties
+      doc.setProperties({
+        title: 'Provider Shift Patterns Report',
+        subject: 'Shift scheduling patterns by provider',
+        author: 'Calendar Application',
+        creator: 'Shift Pattern Report Generator'
+      });
       
-      // Display one-time shifts if any
-      if (oneTimeShifts.length > 0) {
+      // Add title
+      doc.setFontSize(18);
+      doc.text('Provider Shift Patterns Report', 14, 20);
+      doc.setFontSize(11);
+      doc.text(`Generated on ${format(new Date(), 'MMM d, yyyy h:mm a')}`, 14, 28);
+      
+      // Group shifts by provider and series
+      const providerMap = this.groupShiftsBySeries();
+      
+      let yPosition = 40;
+      const pageHeight = doc.internal.pageSize.height;
+      
+      // Iterate through each provider
+      Array.from(providerMap.entries()).forEach(([providerId, data]) => {
+        const { provider, recurringShiftSeries, oneTimeShifts } = data;
+        
         // Check if we need a new page
         if (yPosition > pageHeight - 40) {
           doc.addPage();
           yPosition = 20;
         }
         
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text('One-Time Shifts:', 14, yPosition);
-        yPosition += 7;
+        // Provider header
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 128);
+        doc.text(`${provider.firstName} ${provider.lastName}`, 14, yPosition);
+        yPosition += 8;
         
-        // Table for one-time shifts
-        const oneTimeTableData = oneTimeShifts.map((shift: {
-          startDate: string | any;
-          endDate: string | any;
-          isVacation: boolean;
-          clinicTypeId?: string;
-          location?: string;
-          notes?: string;
-        }) => {
-          const date = this.formatDate(shift.startDate).split(' ')[0] + ' ' + this.formatDate(shift.startDate).split(' ')[1];
-          const startTime = this.formatTime(shift.startDate);
-          const endTime = this.formatTime(shift.endDate);
-          const clinicName = this.getClinicTypeName(shift.clinicTypeId);
+        // If provider has no shifts, note that
+        if (recurringShiftSeries.length === 0 && oneTimeShifts.length === 0) {
+          doc.setFontSize(11);
+          doc.setTextColor(100, 100, 100);
+          doc.text('No shifts scheduled', 14, yPosition);
+          yPosition += 15;
+          return;
+        }
+        
+        // Display recurring shift patterns
+        if (recurringShiftSeries.length > 0) {
+          doc.setFontSize(12);
+          doc.setTextColor(0, 0, 0);
+          doc.text('Recurring Shift Patterns:', 14, yPosition);
+          yPosition += 7;
           
-          return [
-            date,
-            shift.isVacation ? 'Vacation' : `${startTime} - ${endTime}`,
-            clinicName,
-            shift.location || 'N/A',
-            shift.notes || ''
-          ];
-        });
+          // Table for recurring shifts with enhanced description
+          const recurringTableData = recurringShiftSeries.map((series: {
+            clinicTypeId?: string;
+            [key: string]: any;
+          }) => {
+            const clinicName = this.getClinicTypeName(series.clinicTypeId);
+            const patternDescription = this.formatShiftPatternDescription(series);
+            
+            return [
+              patternDescription,
+              clinicName,
+              series.location || 'N/A',
+              series.notes || ''
+            ];
+          });
+          
+          // Add recurring shifts table with updated columns
+          doc.autoTable({
+            startY: yPosition,
+            head: [['Shift Pattern', 'Clinic', 'Location', 'Notes']],
+            body: recurringTableData,
+            theme: 'striped',
+            headStyles: { fillColor: [66, 133, 244], textColor: 255 },
+            margin: { left: 14, right: 14 },
+            styles: { overflow: 'linebreak', cellWidth: 'auto' },
+            columnStyles: {
+              0: { cellWidth: 90 },
+              1: { cellWidth: 30 },
+              2: { cellWidth: 30 },
+              3: { cellWidth: 40 }
+            }
+          });
+          
+          yPosition = (doc as any).lastAutoTable.finalY + 10;
+        }
         
-        // Add one-time shifts table
-        doc.autoTable({
-          startY: yPosition,
-          head: [['Date', 'Time/Type', 'Clinic', 'Location', 'Notes']],
-          body: oneTimeTableData,
-          theme: 'striped',
-          headStyles: { fillColor: [76, 175, 80], textColor: 255 },
-          margin: { left: 14, right: 14 },
-          styles: { overflow: 'linebreak', cellWidth: 'auto' },
-          columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 30 },
-            2: { cellWidth: 30 },
-            3: { cellWidth: 30 },
-            4: { cellWidth: 40 }
+        // Display one-time shifts if any
+        if (oneTimeShifts.length > 0) {
+          // Check if we need a new page
+          if (yPosition > pageHeight - 40) {
+            doc.addPage();
+            yPosition = 20;
           }
-        });
+          
+          doc.setFontSize(12);
+          doc.setTextColor(0, 0, 0);
+          doc.text('One-Time Shifts:', 14, yPosition);
+          yPosition += 7;
+          
+          // Table for one-time shifts
+          const oneTimeTableData = oneTimeShifts.map((shift: {
+            startDate: string | any;
+            endDate: string | any;
+            isVacation: boolean;
+            clinicTypeId?: string;
+            location?: string;
+            notes?: string;
+          }) => {
+            const date = this.formatDate(shift.startDate).split(' ')[0] + ' ' + this.formatDate(shift.startDate).split(' ')[1];
+            const startTime = this.formatTime(shift.startDate);
+            const endTime = this.formatTime(shift.endDate);
+            const clinicName = this.getClinicTypeName(shift.clinicTypeId);
+            
+            return [
+              date,
+              shift.isVacation ? 'Vacation' : `${startTime} - ${endTime}`,
+              clinicName,
+              shift.location || 'N/A',
+              shift.notes || ''
+            ];
+          });
+          
+          // Add one-time shifts table
+          doc.autoTable({
+            startY: yPosition,
+            head: [['Date', 'Time/Type', 'Clinic', 'Location', 'Notes']],
+            body: oneTimeTableData,
+            theme: 'striped',
+            headStyles: { fillColor: [76, 175, 80], textColor: 255 },
+            margin: { left: 14, right: 14 },
+            styles: { overflow: 'linebreak', cellWidth: 'auto' },
+            columnStyles: {
+              0: { cellWidth: 25 },
+              1: { cellWidth: 30 },
+              2: { cellWidth: 30 },
+              3: { cellWidth: 30 },
+              4: { cellWidth: 40 }
+            }
+          });
+          
+          yPosition = (doc as any).lastAutoTable.finalY + 15;
+        }
         
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-      }
+        // Add some space after each provider
+        yPosition += 5;
+      });
       
-      // Add some space after each provider
-      yPosition += 5;
-    });
-    
-    // Save the PDF
-    doc.save('provider-shift-patterns.pdf');
+      // Save the PDF
+      doc.save('provider-shift-patterns.pdf');
+    } catch (error) {
+      console.error('Error in generatePdf:', error);
+      throw error;
+    }
   }
 
   /**
-   * Format date for display
+   * Format date for display, with safety checks
    */
   private formatDate(date: any): string {
     if (!date) return 'N/A';
     
-    // Handle both Firestore timestamps and ISO strings
-    if (typeof date === 'string') {
-      return format(parseISO(date), 'MMM d, yyyy h:mm a');
+    try {
+      // Handle both Firestore timestamps and ISO strings
+      if (typeof date === 'string') {
+        return format(parseISO(date), 'MMM d, yyyy h:mm a');
+      }
+      
+      // Handle Firestore Timestamp
+      if (date && typeof date === 'object' && date.toDate && typeof date.toDate === 'function') {
+        return format(date.toDate(), 'MMM d, yyyy h:mm a');
+      }
+      
+      // Handle Date objects directly
+      if (date instanceof Date) {
+        return format(date, 'MMM d, yyyy h:mm a');
+      }
+      
+      return 'Invalid date';
+    } catch (error) {
+      console.error('Error formatting date:', error, date);
+      return 'Invalid date format';
     }
-    
-    // Handle Firestore Timestamp
-    if (date.toDate) {
-      return format(date.toDate(), 'MMM d, yyyy h:mm a');
-    }
-    
-    return 'Invalid date';
   }
   
   /**
-   * Format time only (for displaying shift times)
+   * Format time only (for displaying shift times), with safety checks
    */
   private formatTime(date: any): string {
     if (!date) return 'N/A';
     
-    // Handle both Firestore timestamps and ISO strings
-    if (typeof date === 'string') {
-      return format(parseISO(date), 'h:mm a');
+    try {
+      // Handle both Firestore timestamps and ISO strings
+      if (typeof date === 'string') {
+        return format(parseISO(date), 'h:mm a');
+      }
+      
+      // Handle Firestore Timestamp
+      if (date && typeof date === 'object' && date.toDate && typeof date.toDate === 'function') {
+        return format(date.toDate(), 'h:mm a');
+      }
+      
+      // Handle Date objects directly
+      if (date instanceof Date) {
+        return format(date, 'h:mm a');
+      }
+      
+      return 'Invalid time';
+    } catch (error) {
+      console.error('Error formatting time:', error, date);
+      return 'Invalid time format';
     }
-    
-    // Handle Firestore Timestamp
-    if (date.toDate) {
-      return format(date.toDate(), 'h:mm a');
-    }
-    
-    return 'Invalid time';
   }
   
   /**

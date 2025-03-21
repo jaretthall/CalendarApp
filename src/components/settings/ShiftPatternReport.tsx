@@ -11,8 +11,10 @@ import { PictureAsPdf, Download } from '@mui/icons-material';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { firestore } from '../../config/firebase-config';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format, parseISO, isMonday, isTuesday, isWednesday, isThursday, isFriday, isSaturday, isSunday, getDay } from 'date-fns';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
 
 // Add the missing types for jsPDF-autotable
 declare module 'jspdf' {
@@ -80,11 +82,17 @@ const ShiftPatternReport: React.FC = () => {
   const [clinicTypes, setClinicTypes] = useState<ClinicType[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   
   // Fetch all necessary data when component mounts
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthenticated) {
+      fetchData();
+    } else {
+      setError('You must be logged in to access this report');
+    }
+  }, [isAuthenticated]);
   
   // Load all required data from Firestore
   const fetchData = async () => {
@@ -92,6 +100,13 @@ const ShiftPatternReport: React.FC = () => {
     setError(null);
     
     try {
+      // Check authentication
+      if (!isAuthenticated) {
+        setError('Authentication required. Please log in.');
+        setLoading(false);
+        return;
+      }
+      
       // Get all providers
       const providersSnapshot = await getDocs(collection(firestore, 'providers'));
       const providersData = providersSnapshot.docs.map(doc => ({
@@ -117,9 +132,12 @@ const ShiftPatternReport: React.FC = () => {
       setShifts(shiftsData);
       
       setDataLoaded(true);
+      enqueueSnackbar('Data loaded successfully', { variant: 'success' });
     } catch (err) {
       console.error('Error fetching data: ', err);
-      setError('Failed to load data. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(`Failed to load data: ${errorMessage}`);
+      enqueueSnackbar('Error loading data', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -310,11 +328,22 @@ const ShiftPatternReport: React.FC = () => {
       return;
     }
     
+    if (!isAuthenticated) {
+      setError('Authentication required. Please log in.');
+      return;
+    }
+    
     try {
       setLoading(true);
       
       // Create new PDF document
       const doc = new jsPDF();
+      
+      // Ensure autoTable is available on the jsPDF instance
+      if (typeof autoTable !== 'undefined') {
+        // @ts-ignore - Applying autoTable to the jsPDF prototype
+        jsPDF.API.autoTable = autoTable;
+      }
       
       // Set up document properties
       doc.setProperties({
@@ -457,11 +486,13 @@ const ShiftPatternReport: React.FC = () => {
       
       // Save the PDF
       doc.save('provider-shift-patterns.pdf');
-      
+      enqueueSnackbar('Report generated successfully', { variant: 'success' });
       setLoading(false);
     } catch (err) {
       console.error('Error generating PDF: ', err);
-      setError('Failed to generate PDF. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(`Failed to generate PDF: ${errorMessage}`);
+      enqueueSnackbar('Error generating report', { variant: 'error' });
       setLoading(false);
     }
   };

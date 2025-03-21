@@ -4,6 +4,8 @@ import { PictureAsPdf } from '@mui/icons-material';
 import { collection, getDocs } from 'firebase/firestore';
 import { firestore } from '../../config/firebase-config';
 import { generateShiftPatternPdf } from '../../utils/ShiftPatternExport';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSnackbar } from 'notistack';
 
 // Define the types to match those expected by generateShiftPatternPdf
 interface Provider {
@@ -52,10 +54,19 @@ const ShiftPatternReportButton: React.FC<ShiftPatternReportButtonProps> = ({
   fullWidth = false
 }) => {
   const [loading, setLoading] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   
   const handleGenerateReport = async () => {
     setLoading(true);
     try {
+      // Check if user is authenticated
+      if (!isAuthenticated) {
+        enqueueSnackbar('Please log in to generate reports', { variant: 'warning' });
+        setLoading(false);
+        return;
+      }
+      
       // Fetch all the necessary data
       const providersSnapshot = await getDocs(collection(firestore, 'providers'));
       const providers = providersSnapshot.docs.map(doc => ({
@@ -77,9 +88,13 @@ const ShiftPatternReportButton: React.FC<ShiftPatternReportButtonProps> = ({
       
       // Generate the PDF
       await generateShiftPatternPdf(providers, clinicTypes, shifts);
+      enqueueSnackbar('Report generated successfully', { variant: 'success' });
     } catch (error) {
       console.error('Error generating shift pattern report:', error);
-      // In a real app, you might want to show an error message to the user
+      // Show error message to the user
+      enqueueSnackbar('Failed to generate report: ' + (error instanceof Error ? error.message : 'Unknown error'), { 
+        variant: 'error' 
+      });
     } finally {
       setLoading(false);
     }
