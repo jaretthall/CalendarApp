@@ -104,7 +104,10 @@ export class ShiftPatternExport {
         yPosition += 7;
         
         // Table for recurring shifts with enhanced description
-        const recurringTableData = recurringShiftSeries.map(series => {
+        const recurringTableData = recurringShiftSeries.map((series: {
+          clinicTypeId?: string;
+          [key: string]: any;
+        }) => {
           const clinicName = this.getClinicTypeName(series.clinicTypeId);
           const patternDescription = this.formatShiftPatternDescription(series);
           
@@ -150,7 +153,14 @@ export class ShiftPatternExport {
         yPosition += 7;
         
         // Table for one-time shifts
-        const oneTimeTableData = oneTimeShifts.map(shift => {
+        const oneTimeTableData = oneTimeShifts.map((shift: {
+          startDate: string | any;
+          endDate: string | any;
+          isVacation: boolean;
+          clinicTypeId?: string;
+          location?: string;
+          notes?: string;
+        }) => {
           const date = this.formatDate(shift.startDate).split(' ')[0] + ' ' + this.formatDate(shift.startDate).split(' ')[1];
           const startTime = this.formatTime(shift.startDate);
           const endTime = this.formatTime(shift.endDate);

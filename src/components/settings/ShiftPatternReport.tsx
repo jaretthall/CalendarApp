@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { PictureAsPdf, Download } from '@mui/icons-material';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { firestore } from '../../config/firebase-config';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { format, parseISO, isMonday, isTuesday, isWednesday, isThursday, isFriday, isSaturday, isSunday, getDay } from 'date-fns';
@@ -21,6 +21,54 @@ declare module 'jspdf' {
   }
 }
 
+// Define the types to match the expected types in the application
+interface Provider {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface ClinicType {
+  id: string;
+  name: string;
+}
+
+interface Shift {
+  id: string;
+  providerId: string;
+  clinicTypeId?: string;
+  startDate: string | any;
+  endDate: string | any;
+  isVacation: boolean;
+  isRecurring: boolean;
+  recurrencePattern?: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  recurrenceEndDate?: string | any;
+  seriesId?: string;
+  notes?: string;
+  location?: string;
+}
+
+// Define additional types for the grouped data structure
+interface ShiftSeries {
+  seriesId: string;
+  pattern?: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  startDate: string | any;
+  endDate: string | any;
+  recurrenceEndDate?: string | any;
+  clinicTypeId?: string;
+  isVacation: boolean;
+  location?: string;
+  notes?: string;
+  shifts: Shift[];
+  firstShift: Shift;
+}
+
+interface ProviderData {
+  provider: Provider;
+  recurringShiftSeries: ShiftSeries[];
+  oneTimeShifts: Shift[];
+}
+
 /**
  * Component for generating and downloading shift pattern reports
  * Shows recurring shift patterns and one-time shifts by provider
@@ -28,9 +76,9 @@ declare module 'jspdf' {
 const ShiftPatternReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [providers, setProviders] = useState<any[]>([]);
-  const [clinicTypes, setClinicTypes] = useState<any[]>([]);
-  const [shifts, setShifts] = useState<any[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [clinicTypes, setClinicTypes] = useState<ClinicType[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   
   // Fetch all necessary data when component mounts
@@ -45,27 +93,27 @@ const ShiftPatternReport: React.FC = () => {
     
     try {
       // Get all providers
-      const providersSnapshot = await getDocs(collection(db, 'providers'));
+      const providersSnapshot = await getDocs(collection(firestore, 'providers'));
       const providersData = providersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Provider[];
       setProviders(providersData);
       
       // Get all clinic types
-      const clinicTypesSnapshot = await getDocs(collection(db, 'clinicTypes'));
+      const clinicTypesSnapshot = await getDocs(collection(firestore, 'clinicTypes'));
       const clinicTypesData = clinicTypesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as ClinicType[];
       setClinicTypes(clinicTypesData);
       
       // Get all shifts
-      const shiftsSnapshot = await getDocs(collection(db, 'shifts'));
+      const shiftsSnapshot = await getDocs(collection(firestore, 'shifts'));
       const shiftsData = shiftsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Shift[];
       setShifts(shiftsData);
       
       setDataLoaded(true);
@@ -78,7 +126,7 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Format date for display
-  const formatDate = (date: any) => {
+  const formatDate = (date: any): string => {
     if (!date) return 'N/A';
     
     // Handle both Firestore timestamps and ISO strings
@@ -95,7 +143,7 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Format time only (for displaying shift times)
-  const formatTime = (date: any) => {
+  const formatTime = (date: any): string => {
     if (!date) return 'N/A';
     
     // Handle both Firestore timestamps and ISO strings
@@ -112,14 +160,15 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Get provider name from provider ID
-  const getProviderName = (providerId: string) => {
+  const getProviderName = (providerId: string): string => {
     const provider = providers.find(p => p.id === providerId);
     if (!provider) return 'Unknown Provider';
     return `${provider.firstName} ${provider.lastName}`;
   };
   
   // Get clinic type name from clinic type ID
-  const getClinicTypeName = (clinicTypeId: string) => {
+  const getClinicTypeName = (clinicTypeId?: string): string => {
+    if (!clinicTypeId) return 'No Clinic';
     const clinicType = clinicTypes.find(c => c.id === clinicTypeId);
     if (!clinicType) return 'Unknown Clinic';
     return clinicType.name;
@@ -131,7 +180,7 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Determine what days of the week a recurring shift occurs on
-  const getDaysOfWeek = (firstShift: any, pattern: string): string => {
+  const getDaysOfWeek = (firstShift: Shift, pattern: string): string => {
     if (!firstShift.startDate) return 'Unknown days';
     
     const startDate = typeof firstShift.startDate === 'string' 
@@ -155,7 +204,9 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Convert recurrence pattern to human-readable text
-  const formatRecurrencePattern = (pattern: string, firstShift: any) => {
+  const formatRecurrencePattern = (pattern: string | undefined, firstShift: Shift): string => {
+    if (!pattern || !firstShift || !firstShift.startDate) return 'N/A';
+    
     const startDate = typeof firstShift.startDate === 'string' 
       ? parseISO(firstShift.startDate) 
       : firstShift.startDate.toDate();
@@ -177,9 +228,9 @@ const ShiftPatternReport: React.FC = () => {
   };
   
   // Group shifts by series for recurring shifts
-  const groupShiftsBySeries = () => {
+  const groupShiftsBySeries = (): Map<string, ProviderData> => {
     // Create map of providers
-    const providerMap = new Map();
+    const providerMap = new Map<string, ProviderData>();
     
     // First, separate shifts by provider
     providers.forEach(provider => {
@@ -190,14 +241,14 @@ const ShiftPatternReport: React.FC = () => {
       const oneTimeShifts = providerShifts.filter(shift => !shift.isRecurring);
       
       // Group recurring shifts by series ID
-      const seriesMap = new Map();
+      const seriesMap = new Map<string, Shift[]>();
       recurringShifts.forEach(shift => {
         if (!shift.seriesId) return;
         
         if (!seriesMap.has(shift.seriesId)) {
           seriesMap.set(shift.seriesId, []);
         }
-        seriesMap.get(shift.seriesId).push(shift);
+        seriesMap.get(shift.seriesId)!.push(shift);
       });
       
       // Structure the data
@@ -228,7 +279,7 @@ const ShiftPatternReport: React.FC = () => {
   };
 
   // Format the full shift pattern description  
-  const formatShiftPatternDescription = (series: any) => {
+  const formatShiftPatternDescription = (series: ShiftSeries): string => {
     const startTime = formatTime(series.startDate);
     const endTime = formatTime(series.endDate);
     const firstDate = typeof series.startDate === 'string' 
@@ -318,8 +369,8 @@ const ShiftPatternReport: React.FC = () => {
           yPosition += 7;
           
           // Table for recurring shifts with enhanced description
-          const recurringTableData = recurringShiftSeries.map(series => {
-            const clinicName = getClinicTypeName(series.clinicTypeId);
+          const recurringTableData = recurringShiftSeries.map((series: ShiftSeries) => {
+            const clinicName = getClinicTypeName(series.clinicTypeId || '');
             const patternDescription = formatShiftPatternDescription(series);
             
             return [
