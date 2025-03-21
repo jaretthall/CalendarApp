@@ -12,8 +12,9 @@ import SyncSettings from './SyncSettings';
 import ProvidersSettings from './ProvidersSettings';
 import ClinicsSettings from './ClinicsSettings';
 import AccountSettings from './AccountSettings';
+import ShiftPatternReport from './ShiftPatternReport';
 import { useAuth } from '../../contexts/AuthContext';
-import { People, LocationOn, Sync, Settings as SettingsIcon } from '@mui/icons-material';
+import { People, LocationOn, Sync, Settings as SettingsIcon, Assessment } from '@mui/icons-material';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -74,7 +75,8 @@ const SettingsPage: React.FC = () => {
             <Tab icon={<People />} label="Providers" {...a11yProps(1)} />
             <Tab icon={<LocationOn />} label="Clinic Types" {...a11yProps(2)} />
             <Tab icon={<SettingsIcon />} label="Display" {...a11yProps(3)} />
-            <Tab icon={<SettingsIcon />} label="Account" {...a11yProps(4)} disabled={!isAuthenticated || isReadOnly} />
+            <Tab icon={<Assessment />} label="Reports" {...a11yProps(4)} />
+            <Tab icon={<SettingsIcon />} label="Account" {...a11yProps(5)} disabled={!isAuthenticated || isReadOnly} />
           </Tabs>
           
           <TabPanel value={tabValue} index={0}>
@@ -97,6 +99,14 @@ const SettingsPage: React.FC = () => {
           </TabPanel>
           
           <TabPanel value={tabValue} index={4}>
+            <Typography variant="h6">Reports</Typography>
+            <Typography variant="body1" sx={{ mt: 2, mb: 3 }}>
+              Generate and download reports to analyze scheduling patterns.
+            </Typography>
+            <ShiftPatternReport />
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={5}>
             {isReadOnly ? (
               <Alert severity="info">
                 Please log in with full access to manage account settings.

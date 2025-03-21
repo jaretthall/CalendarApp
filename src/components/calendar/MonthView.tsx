@@ -8,7 +8,8 @@ import {
   useTheme,
   ToggleButtonGroup,
   ToggleButton,
-  Tooltip
+  Tooltip,
+  Divider
 } from '@mui/material';
 import {
   ArrowBack,
@@ -31,6 +32,7 @@ import { useClinicTypes } from '../../contexts/LocationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProviders } from '../../contexts/EmployeeContext';
 import NotesSection from './NotesSection';
+import ShiftPatternReportButton from '../common/ShiftPatternReportButton';
 import './Calendar.css';
 
 const MonthView: React.FC = () => {
@@ -288,6 +290,14 @@ const MonthView: React.FC = () => {
                 <ViewWeek />
               </ToggleButton>
             </ToggleButtonGroup>
+            
+            <Divider orientation="vertical" flexItem sx={{ mx: 2 }} />
+            
+            <ShiftPatternReportButton 
+              variant="outlined" 
+              size="small"
+              tooltip="Generate a PDF report showing recurring shift patterns rather than individual shifts"
+            />
           </Box>
         </Box>
         
