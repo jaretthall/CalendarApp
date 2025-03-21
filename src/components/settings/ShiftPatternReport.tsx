@@ -19,7 +19,7 @@ import { useSnackbar } from 'notistack';
 // Add the missing types for jsPDF-autotable
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: typeof autoTable;
   }
 }
 
@@ -339,12 +339,6 @@ const ShiftPatternReport: React.FC = () => {
       // Create new PDF document
       const doc = new jsPDF();
       
-      // Ensure autoTable is available on the jsPDF instance
-      if (typeof autoTable !== 'undefined') {
-        // @ts-ignore - Applying autoTable to the jsPDF prototype
-        jsPDF.API.autoTable = autoTable;
-      }
-      
       // Set up document properties
       doc.setProperties({
         title: 'Provider Shift Patterns Report',
@@ -411,7 +405,7 @@ const ShiftPatternReport: React.FC = () => {
           });
           
           // Add recurring shifts table with updated columns
-          doc.autoTable({
+          autoTable(doc, {
             startY: yPosition,
             head: [['Shift Pattern', 'Clinic', 'Location', 'Notes']],
             body: recurringTableData,
@@ -427,7 +421,8 @@ const ShiftPatternReport: React.FC = () => {
             }
           });
           
-          yPosition = (doc as any).lastAutoTable.finalY + 10;
+          // @ts-ignore - TS doesn't recognize the lastAutoTable property
+          yPosition = doc.lastAutoTable.finalY + 10;
         }
         
         // Display one-time shifts if any
@@ -460,7 +455,7 @@ const ShiftPatternReport: React.FC = () => {
           });
           
           // Add one-time shifts table
-          doc.autoTable({
+          autoTable(doc, {
             startY: yPosition,
             head: [['Date', 'Time/Type', 'Clinic', 'Location', 'Notes']],
             body: oneTimeTableData,
@@ -477,7 +472,8 @@ const ShiftPatternReport: React.FC = () => {
             }
           });
           
-          yPosition = (doc as any).lastAutoTable.finalY + 15;
+          // @ts-ignore - TS doesn't recognize the lastAutoTable property
+          yPosition = doc.lastAutoTable.finalY + 15;
         }
         
         // Add some space after each provider

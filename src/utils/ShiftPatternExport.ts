@@ -33,7 +33,7 @@ interface Shift {
 // Add the missing types for jsPDF-autotable
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: typeof autoTable;
   }
 }
 
@@ -69,17 +69,6 @@ export class ShiftPatternExport {
     try {
       // Create new PDF document
       const doc = new jsPDF();
-      
-      // Ensure autoTable is available on the jsPDF instance
-      if (typeof autoTable !== 'undefined') {
-        // @ts-ignore - Applying autoTable to the jsPDF prototype
-        jsPDF.API.autoTable = autoTable;
-      }
-      
-      // Check that autoTable is applied to doc
-      if (!doc.autoTable) {
-        throw new Error('autoTable is not available on jsPDF instance');
-      }
       
       // Set up document properties
       doc.setProperties({
@@ -150,7 +139,7 @@ export class ShiftPatternExport {
           });
           
           // Add recurring shifts table with updated columns
-          doc.autoTable({
+          autoTable(doc, {
             startY: yPosition,
             head: [['Shift Pattern', 'Clinic', 'Location', 'Notes']],
             body: recurringTableData,
@@ -166,7 +155,8 @@ export class ShiftPatternExport {
             }
           });
           
-          yPosition = (doc as any).lastAutoTable.finalY + 10;
+          // @ts-ignore - TS doesn't recognize the lastAutoTable property
+          yPosition = doc.lastAutoTable.finalY + 10;
         }
         
         // Display one-time shifts if any
@@ -206,7 +196,7 @@ export class ShiftPatternExport {
           });
           
           // Add one-time shifts table
-          doc.autoTable({
+          autoTable(doc, {
             startY: yPosition,
             head: [['Date', 'Time/Type', 'Clinic', 'Location', 'Notes']],
             body: oneTimeTableData,
@@ -223,7 +213,8 @@ export class ShiftPatternExport {
             }
           });
           
-          yPosition = (doc as any).lastAutoTable.finalY + 15;
+          // @ts-ignore - TS doesn't recognize the lastAutoTable property
+          yPosition = doc.lastAutoTable.finalY + 15;
         }
         
         // Add some space after each provider
